@@ -35,7 +35,7 @@ class AdvancementCalculator:
             return new_rating * 20
 
     @staticmethod
-    def calculate_skill_cost(new_rating):
+    def calculate_skill_cost(new_rating, vocation=None, skill_name=None):
         """
         Calculate XP cost for advancing a skill to the new rating.
 
@@ -43,16 +43,28 @@ class AdvancementCalculator:
         - Levels 1-5: New Rating × 5 XP
         - Levels 6-7: New Rating × 15 XP
 
+        Modified by vocation multiplier (crafters pay less for crafting, etc)
+
         Args:
             new_rating: The target rating (1-10)
+            vocation: Character's vocation (for multiplier)
+            skill_name: Name of skill (for multiplier)
 
         Returns:
             int: XP cost
         """
         if new_rating <= 5:
-            return new_rating * 5
+            base_cost = new_rating * 5
         else:
-            return new_rating * 15
+            base_cost = new_rating * 15
+
+        # Apply vocation multiplier if provided
+        if vocation and skill_name:
+            from world.witcher_rpg.crafting_models import VocationSkillCostMultiplier
+            multiplier = VocationSkillCostMultiplier.get_multiplier(vocation, skill_name)
+            base_cost = int(base_cost * multiplier)
+
+        return base_cost
 
     @staticmethod
     def requires_approval(new_rating):
@@ -223,8 +235,12 @@ class AdvancementManager:
 
         new_value = current_value + 1
 
-        # Calculate XP cost
-        xp_cost = AdvancementCalculator.calculate_skill_cost(new_value)
+        # Calculate XP cost (with vocation multiplier)
+        xp_cost = AdvancementCalculator.calculate_skill_cost(
+            new_value,
+            vocation=db_char.vocation,
+            skill_name=skill_name
+        )
 
         # Check if approval is required
         needs_approval = AdvancementCalculator.requires_approval(new_value)
@@ -325,7 +341,11 @@ class AdvancementManager:
             xp_cost = AdvancementCalculator.calculate_stat_cost(current_value + 1)
         else:
             current_value = getattr(db_char.skills, stat_or_skill_name, 0)
-            xp_cost = AdvancementCalculator.calculate_skill_cost(current_value + 1)
+            xp_cost = AdvancementCalculator.calculate_skill_cost(
+                current_value + 1,
+                vocation=db_char.vocation,
+                skill_name=stat_or_skill_name
+            )
 
         target_value = current_value + 1
 
@@ -505,13 +525,22 @@ class AdvancementManager:
             current = getattr(db_char.skills, skill_name, 0)
             if current < 10:
                 next_value = current + 1
-                cost = AdvancementCalculator.calculate_skill_cost(next_value)
+                cost = AdvancementCalculator.calculate_skill_cost(
+                    next_value,
+                    vocation=db_char.vocation,
+                    skill_name=skill_name
+                )
                 needs_approval = AdvancementCalculator.requires_approval(next_value)
+
+                # Get multiplier for display
+                from world.witcher_rpg.crafting_models import VocationSkillCostMultiplier
+                multiplier = VocationSkillCostMultiplier.get_multiplier(db_char.vocation, skill_name)
 
                 preview['skills'][skill_name] = {
                     'current': current,
                     'next': next_value,
                     'cost': cost,
+                    'multiplier': multiplier,
                     'needs_approval': needs_approval,
                     'can_afford': db_char.experience_points >= cost
                 }
