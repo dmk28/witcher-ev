@@ -133,6 +133,88 @@
 - `denyreq` (GM) - Deny request
 - `viewreq` (GM) - View request details
 
+### 10. Equipment & Content System
+**Status**: Complete (items populated)
+**Files**: `world/witcher_rpg/item_models.py`, `world/witcher_rpg/migrations/0020_*.py`, `0021_*.py`
+
+**Enhancements**:
+- WeaponType enum linking weapons to skills (blades, axes, maces, spears, crossbows, brawling)
+- ArmorType enum for light, medium, heavy armor
+- EquipmentSlot enum (12 slots: main/off-hand weapons, shield, head, chest, legs, feet, hands, back, neck, ring_1, ring_2)
+- New ItemTemplate fields: weapon_type, armor_type, equipment_slot
+
+**Content Created (40 items)**:
+- **Weapons (21 total)**:
+  - Blades: Iron Sword, Steel Longsword, Silver Sword, Aerondight (legendary), Iron Dagger
+  - Axes: Woodcutter Axe, Battle Axe, Dwarven Great Axe, Mahakam Rune Axe (legendary)
+  - Maces: Club, Steel Mace, War Hammer, Gesheft (legendary)
+  - Spears: Spear, Pike, Halberd, Gae Bolg (legendary)
+  - Ranged: Shortbow, Light Crossbow, Heavy Crossbow, Elven Longbow (legendary)
+- **Shields (4 total)**:
+  - Wooden Shield, Steel Shield, Kite Shield, Aegis of Kings (legendary)
+- **Armor (15 total)**:
+  - Light: Leather Cap, Leather Armor, Leather Pants, Leather Boots, Leather Gloves
+  - Medium: Chainmail Coif, Chainmail Armor, Chainmail Leggings, Chainmail Gauntlets
+  - Heavy: Steel Helm, Plate Armor, Full Plate Armor (legendary), Plate Greaves, Plate Boots, Plate Gauntlets
+
+**Legendary Features**:
+- 7 Tier IV items with special abilities
+- Stat bonuses on higher-tier equipment
+- Unique legendary effects (e.g., Aerondight gains damage on hits, Aegis regenerates armor)
+
+**Integration**:
+- Weapons link to CharacterSkill system for combat
+- Equipment slots ready for equip/unequip commands
+- Compatible with existing inventory and shop systems
+
+### 11. Communication System
+**Status**: Complete
+**Files**: `typeclasses/channels.py`, `commands/comms_commands.py`
+
+**Channel Types**:
+- PublicChannel: Open to all players
+- OrganizationChannel: Auto-manages subscriptions based on org membership
+- FactionChannel: Country or vocation-based access control
+- PrivateChannel: Owner-controlled membership
+
+**Commands**:
+- `+page/page/tell` - Send private messages to players
+- `+pagehistory/+ph` - View message history (50 messages stored)
+- `+afk` - Set away status with message
+- `+busy` - Set busy/DND status
+- `+channels` - List accessible channels
+- `+channelcreate` (GM) - Create org/faction/private channels
+- `+channeldelete` (GM) - Delete channels
+
+**Features**:
+- Auto-subscribe on org join/approval
+- Auto-unsubscribe on org leave/kick
+- AFK/Busy status display when paging
+- Timestamp all messages
+- Access control integrated with organization membership
+
+### 12. MUSH Formatting System
+**Status**: Complete
+**Files**: `world/witcher_rpg/mush_utils.py`, `MUSH_FORMATTING_GUIDE.md`
+
+**Formatting Tokens**:
+- `%r` / `%R` - Carriage return (newline)
+- `%t` / `%T` - Tab (4 spaces)
+- `%b` / `%B` - Single space
+- `%cr`, `%cg`, `%cy`, `%cb`, `%cm`, `%cc`, `%cw`, `%cx` - Color codes
+- `%cn` - Reset color
+- `%ch` - Highlight/Bold
+
+**Functions**:
+- `convert_mush_tokens()` - Convert to in-game Evennia format
+- `process_mush_text()` - Convert for web display (HTML)
+- Helper functions: `format_header()`, `format_table_row()`, `mush_table()`, `wrap_output()`
+
+**Web Integration**:
+- Automatic conversion: %r → `<br>`, %t → `&nbsp;` (4x), colors → `<span style="...">`
+- Consistent formatting across in-game and web interfaces
+- Used in income commands and communication commands
+
 ## 📋 TODO / Incomplete Features
 
 ### High Priority
@@ -227,6 +309,9 @@ All migrations applied successfully:
 - 0016: (Skipped - renumbered to 0018)
 - 0017: Make recipe.result_item nullable, add artisan to choices
 - 0018: Sample recipes and item sets
+- 0019: (Previous - skipped)
+- 0020: Weapon/armor equipment system (weapon_type, armor_type, equipment_slot fields)
+- 0021: Populate 40 weapons, armor, and shields with tier/stats/abilities
 
 ## 📚 Documentation
 
@@ -264,6 +349,20 @@ Complete documentation available:
    - Crafting mechanics
    - Admin interfaces
 
+7. **COMMUNICATION_SYSTEM_GUIDE.md** (30KB)
+   - Paging system with history
+   - Organization channels with auto-subscribe
+   - Faction channels (country/vocation)
+   - Private channels
+   - AFK/Busy status management
+
+8. **MUSH_FORMATTING_GUIDE.md** (15KB)
+   - MUSH token reference (%r, %t, %b, colors)
+   - Web vs in-game formatting
+   - Helper functions and utilities
+   - Command output templates
+   - Best practices
+
 ## 🎮 Admin Interface
 
 Complete Django admin at `/admin/`:
@@ -277,7 +376,7 @@ Complete Django admin at `/admin/`:
 
 ## 🔧 Command Summary
 
-### Player Commands (50+)
+### Player Commands (60+)
 **Character**: requestchar, myrequests, advance, request, history
 **Combat**: combatstart, attack, cast, stance, combatstatus
 **Social**: intrigue, seduce, negotiate, intimidate, social, socialstance, socialstatus
@@ -286,21 +385,24 @@ Complete Django admin at `/admin/`:
 **Crafting**: recipes, craft, setbonus, crafthistory
 **Mission**: mission, extract
 **Room**: room
+**Communication**: +page/page/tell, +pagehistory/+ph, +afk, +busy, +channels
 
-### GM Commands (15+)
+### GM Commands (20+)
 **Character**: approve/deny (advancement)
 **Shop**: shopmanage
 **Crafting**: learnrecipe
 **Requests**: gmrequests, approvereq, denyreq, viewreq
+**Communication**: +channelcreate, +channeldelete
 **Admin**: Access via /admin/ for all models
 
 ## 📈 System Statistics
 
 **Total Models**: 40+ Django models
-**Total Commands**: 65+ player and GM commands
-**Total Lines of Code**: ~15,000+ lines (excluding migrations)
-**Migrations**: 18 applied successfully
-**Documentation**: 6 comprehensive guides (85KB total)
+**Total Commands**: 70+ player and GM commands
+**Total Lines of Code**: ~18,000+ lines (excluding migrations)
+**Total Content**: 40 weapons, armor, and shields across all tiers
+**Migrations**: 21 applied successfully
+**Documentation**: 8 comprehensive guides (130KB total)
 
 ## 🚀 What's Working Right Now
 
@@ -311,7 +413,10 @@ Complete Django admin at `/admin/`:
 5. **Advancement**: Spend XP to advance with vocation-based costs
 6. **Crafting Workflow**: Learn recipes, craft items, gain XP
 7. **Request System**: Submit and review GM approval requests
-8. **Admin Tools**: Complete Django admin for all systems
+8. **Equipment & Content**: 40 weapons/armor/shields with tiers and legendary items
+9. **Communication**: Paging, org/faction channels with auto-subscribe
+10. **MUSH Formatting**: Cross-platform text formatting for in-game and web
+11. **Admin Tools**: Complete Django admin for all systems
 
 ## 🔨 What Needs Work
 
