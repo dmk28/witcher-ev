@@ -91,6 +91,15 @@ from commands.income_commands import (
     CmdOrgCreate,
     CmdOrgEdit
 )
+from commands.comms_commands import (
+    CmdPage,
+    CmdPageHistory,
+    CmdAfk,
+    CmdBusy,
+    CmdChannels,
+    CmdChannelCreate,
+    CmdChannelDelete
+)
 
 
 class CharacterCmdSet(default_cmds.CharacterCmdSet):
@@ -190,6 +199,17 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         # GM commands
         self.add(CmdOrgCreate())
         self.add(CmdOrgEdit())
+
+        # Add communication commands
+        # Player commands
+        self.add(CmdPage())
+        self.add(CmdPageHistory())
+        self.add(CmdAfk())
+        self.add(CmdBusy())
+        self.add(CmdChannels())
+        # GM commands
+        self.add(CmdChannelCreate())
+        self.add(CmdChannelDelete())
 
 
 class AccountCmdSet(default_cmds.AccountCmdSet):

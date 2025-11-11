@@ -339,6 +339,15 @@ class CmdOrgJoin(Command):
             caller.msg(f"You will receive |y{membership.calculate_total_income():,} crowns|n per month.")
             caller.msg("Use |w+income|n to collect your monthly stipend.")
 
+            # Auto-subscribe to organization channel if it exists
+            from evennia.comms.models import ChannelDB
+            org_channel = ChannelDB.objects.filter(
+                db_key__iexact=org.name
+            ).first()
+            if org_channel and org_channel.access(caller, 'listen'):
+                org_channel.connect(caller)
+                caller.msg(f"|gYou have been added to the {org.name} channel.|n")
+
 
 class CmdOrgLeave(Command):
     """
@@ -387,6 +396,15 @@ class CmdOrgLeave(Command):
         membership.save()
 
         caller.msg(f"|gYou have left {org.name}.|n")
+
+        # Auto-unsubscribe from organization channel if it exists
+        from evennia.comms.models import ChannelDB
+        org_channel = ChannelDB.objects.filter(
+            db_key__iexact=org.name
+        ).first()
+        if org_channel and org_channel.has_connection(caller):
+            org_channel.disconnect(caller)
+            caller.msg(f"|gYou have been removed from the {org.name} channel.|n")
 
         # Notify leader
         if org.leader and hasattr(org.leader, 'msg'):
@@ -703,6 +721,15 @@ class CmdOrgManage(Command):
             member.msg(f"|g[ORGANIZATION]|n Your membership in {org.name} has been approved!")
             member.msg("Use |w+income|n to collect your monthly stipend.")
 
+            # Auto-subscribe to organization channel if it exists
+            from evennia.comms.models import ChannelDB
+            org_channel = ChannelDB.objects.filter(
+                db_key__iexact=org.name
+            ).first()
+            if org_channel and org_channel.access(member, 'listen'):
+                org_channel.connect(member)
+                member.msg(f"|gYou have been added to the {org.name} channel.|n")
+
     def _kick_member(self, org, caller):
         """Kick a member from the organization."""
         if not self.rhs:
@@ -734,6 +761,14 @@ class CmdOrgManage(Command):
         membership.save()
 
         caller.msg(f"|g{member.db_key} has been removed from {org.name}.|n")
+
+        # Auto-unsubscribe from organization channel
+        from evennia.comms.models import ChannelDB
+        org_channel = ChannelDB.objects.filter(
+            db_key__iexact=org.name
+        ).first()
+        if org_channel and org_channel.has_connection(member):
+            org_channel.disconnect(member)
 
         # Notify member
         if hasattr(member, 'msg'):
