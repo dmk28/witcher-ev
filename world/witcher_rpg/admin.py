@@ -42,6 +42,10 @@ from .shop_models import (
     ShopTransaction,
     ShopRestockRule
 )
+from .advancement_models import (
+    AdvancementLog,
+    ApprovalRequest
+)
 
 
 class VocationFeatInline(admin.TabularInline):
@@ -706,6 +710,60 @@ class ShopRestockRuleAdmin(admin.ModelAdmin):
         }),
         ('Faction Restrictions', {
             'fields': ('allowed_factions', 'restricted_factions'),
+            'classes': ['collapse']
+        }),
+    )
+
+
+# Advancement System Admin
+
+@admin.register(AdvancementLog)
+class AdvancementLogAdmin(admin.ModelAdmin):
+    """Admin for character advancement log."""
+    list_display = ['character', 'advancement_type', 'stat_or_skill_name', 'old_value', 'new_value', 'xp_cost', 'required_approval', 'timestamp']
+    list_filter = ['advancement_type', 'required_approval', 'timestamp']
+    search_fields = ['character__db_key', 'stat_or_skill_name']
+    readonly_fields = ['timestamp']
+
+    fieldsets = (
+        ('Advancement Info', {
+            'fields': ('character', 'advancement_type', 'stat_or_skill_name')
+        }),
+        ('Values', {
+            'fields': ('old_value', 'new_value', 'xp_cost')
+        }),
+        ('Approval', {
+            'fields': ('required_approval', 'approved_by')
+        }),
+        ('Timestamp', {
+            'fields': ('timestamp',)
+        }),
+    )
+
+
+@admin.register(ApprovalRequest)
+class ApprovalRequestAdmin(admin.ModelAdmin):
+    """Admin for advancement approval requests."""
+    list_display = ['character', 'advancement_type', 'stat_or_skill_name', 'current_value', 'target_value', 'xp_cost', 'status', 'created_at']
+    list_filter = ['advancement_type', 'status', 'created_at']
+    search_fields = ['character__db_key', 'stat_or_skill_name']
+    readonly_fields = ['created_at', 'reviewed_at']
+
+    fieldsets = (
+        ('Request Info', {
+            'fields': ('character', 'advancement_type', 'stat_or_skill_name', 'status')
+        }),
+        ('Values', {
+            'fields': ('current_value', 'target_value', 'xp_cost')
+        }),
+        ('Justification', {
+            'fields': ('justification',)
+        }),
+        ('Review', {
+            'fields': ('reviewed_by', 'review_notes', 'reviewed_at')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at',),
             'classes': ['collapse']
         }),
     )

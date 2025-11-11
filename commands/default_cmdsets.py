@@ -51,6 +51,12 @@ from commands.shop_commands import (
     CmdHaggle,
     CmdShopManage
 )
+from commands.advancement_commands import (
+    CmdAdvance,
+    CmdRequest,
+    CmdApprove,
+    CmdAdvancementHistory
+)
 
 
 class CharacterCmdSet(default_cmds.CharacterCmdSet):
@@ -106,6 +112,12 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdSell())
         self.add(CmdHaggle())
         self.add(CmdShopManage())
+
+        # Add Witcher RPG advancement commands
+        self.add(CmdAdvance())
+        self.add(CmdRequest())
+        self.add(CmdApprove())
+        self.add(CmdAdvancementHistory())
 
 
 class AccountCmdSet(default_cmds.AccountCmdSet):
