@@ -80,6 +80,7 @@ class Vocation(models.Model):
         ('noble', 'Noble'),
         ('alchemist', 'Alchemist'),
         ('merchant', 'Merchant'),
+        ('artisan', 'Artisan'),
     ]
 
     name = models.CharField(

@@ -46,6 +46,17 @@ from .advancement_models import (
     AdvancementLog,
     ApprovalRequest
 )
+from .crafting_models import (
+    CraftingRecipe,
+    ItemSet,
+    LearnedRecipe,
+    CraftingAttempt,
+    VocationSkillCostMultiplier
+)
+from .request_models import (
+    UnifiedRequest,
+    CharacterGenerationRequest
+)
 
 
 class VocationFeatInline(admin.TabularInline):
@@ -767,6 +778,377 @@ class ApprovalRequestAdmin(admin.ModelAdmin):
             'classes': ['collapse']
         }),
     )
+
+
+# ============================================================
+# Crafting System Admin
+# ============================================================
+
+@admin.register(CraftingRecipe)
+class CraftingRecipeAdmin(admin.ModelAdmin):
+    """Admin interface for crafting recipes."""
+
+    list_display = (
+        'name',
+        'crafting_type',
+        'min_skill_level',
+        'base_difficulty',
+        'time_required_minutes',
+        'is_rare',
+        'set_piece'
+    )
+
+    list_filter = (
+        'crafting_type',
+        'min_skill_level',
+        'is_rare',
+        'required_workshop',
+        'set_piece'
+    )
+
+    search_fields = (
+        'name',
+        'discovery_location',
+    )
+
+    readonly_fields = ('id',)
+
+    fieldsets = (
+        ('Basic Info', {
+            'fields': ('name', 'result_item', 'crafting_type')
+        }),
+        ('Requirements', {
+            'fields': (
+                'min_skill_level',
+                'base_difficulty',
+                'required_materials',
+                'required_workshop',
+                'time_required_minutes'
+            )
+        }),
+        ('Costs and Rewards', {
+            'fields': ('xp_reward', 'gold_cost')
+        }),
+        ('Discovery', {
+            'fields': ('is_rare', 'discovery_location')
+        }),
+        ('Set Connection', {
+            'fields': ('set_piece',)
+        }),
+    )
+
+
+@admin.register(ItemSet)
+class ItemSetAdmin(admin.ModelAdmin):
+    """Admin interface for item sets."""
+
+    list_display = (
+        'name',
+        'set_type',
+        'tier',
+        'has_2pc',
+        'has_3pc',
+        'has_4pc',
+        'has_5pc'
+    )
+
+    list_filter = (
+        'set_type',
+        'tier'
+    )
+
+    search_fields = ('name', 'description')
+
+    readonly_fields = ('id',)
+
+    fieldsets = (
+        ('Basic Info', {
+            'fields': ('name', 'description', 'set_type', 'tier')
+        }),
+        ('Set Bonuses', {
+            'fields': (
+                'two_piece_bonus',
+                'three_piece_bonus',
+                'four_piece_bonus',
+                'five_piece_bonus'
+            ),
+            'description': 'JSON format: {"stat": "agility", "value": 1} or {"damage_bonus": 5}'
+        }),
+    )
+
+    def has_2pc(self, obj):
+        """Check if 2-piece bonus exists."""
+        return bool(obj.two_piece_bonus)
+    has_2pc.boolean = True
+    has_2pc.short_description = '2-Piece'
+
+    def has_3pc(self, obj):
+        """Check if 3-piece bonus exists."""
+        return bool(obj.three_piece_bonus)
+    has_3pc.boolean = True
+    has_3pc.short_description = '3-Piece'
+
+    def has_4pc(self, obj):
+        """Check if 4-piece bonus exists."""
+        return bool(obj.four_piece_bonus)
+    has_4pc.boolean = True
+    has_4pc.short_description = '4-Piece'
+
+    def has_5pc(self, obj):
+        """Check if 5-piece bonus exists."""
+        return bool(obj.five_piece_bonus)
+    has_5pc.boolean = True
+    has_5pc.short_description = '5-Piece'
+
+
+@admin.register(LearnedRecipe)
+class LearnedRecipeAdmin(admin.ModelAdmin):
+    """Admin interface for learned recipes."""
+
+    list_display = (
+        'character',
+        'recipe',
+        'learned_date',
+        'times_crafted'
+    )
+
+    list_filter = (
+        'learned_date',
+        'recipe__crafting_type'
+    )
+
+    search_fields = (
+        'character__db_key',
+        'recipe__name'
+    )
+
+    readonly_fields = ('learned_date',)
+
+    fieldsets = (
+        ('Recipe Info', {
+            'fields': ('character', 'recipe', 'learned_date')
+        }),
+        ('Statistics', {
+            'fields': ('times_crafted',)
+        }),
+    )
+
+
+@admin.register(CraftingAttempt)
+class CraftingAttemptAdmin(admin.ModelAdmin):
+    """Admin interface for crafting attempts."""
+
+    list_display = (
+        'character',
+        'recipe',
+        'success',
+        'roll_result',
+        'difficulty',
+        'xp_gained',
+        'timestamp'
+    )
+
+    list_filter = (
+        'success',
+        'timestamp',
+        'recipe__crafting_type'
+    )
+
+    search_fields = (
+        'character__db_key',
+        'recipe__name'
+    )
+
+    readonly_fields = ('timestamp',)
+
+    fieldsets = (
+        ('Attempt Info', {
+            'fields': ('character', 'recipe', 'timestamp')
+        }),
+        ('Results', {
+            'fields': (
+                'success',
+                'roll_result',
+                'difficulty',
+                'xp_gained'
+            )
+        }),
+        ('Materials', {
+            'fields': ('materials_used',),
+            'classes': ['collapse']
+        }),
+    )
+
+
+@admin.register(VocationSkillCostMultiplier)
+class VocationSkillCostMultiplierAdmin(admin.ModelAdmin):
+    """Admin interface for vocation-based XP cost multipliers."""
+
+    list_display = (
+        'vocation',
+        'skill_name',
+        'multiplier',
+        'cost_display'
+    )
+
+    list_filter = (
+        'vocation',
+        'multiplier'
+    )
+
+    search_fields = (
+        'vocation__name',
+        'skill_name'
+    )
+
+    ordering = ('vocation__name', 'skill_name')
+
+    fieldsets = (
+        ('Multiplier Info', {
+            'fields': ('vocation', 'skill_name', 'multiplier'),
+            'description': '1.0 = normal cost, 0.5 = half cost, 2.0 = double cost'
+        }),
+    )
+
+    def cost_display(self, obj):
+        """Show what the multiplier means."""
+        if obj.multiplier < 1.0:
+            return format_html(
+                '<span style="color: green;">{:.0%} cost (specialist)</span>',
+                obj.multiplier
+            )
+        elif obj.multiplier > 1.0:
+            return format_html(
+                '<span style="color: red;">{:.0%} cost (non-specialist)</span>',
+                obj.multiplier
+            )
+        else:
+            return format_html('<span>100% cost (normal)</span>')
+    cost_display.short_description = 'Cost Effect'
+
+
+# ============================================================
+# Unified Request System Admin
+# ============================================================
+
+@admin.register(UnifiedRequest)
+class UnifiedRequestAdmin(admin.ModelAdmin):
+    """Admin interface for unified requests."""
+
+    list_display = (
+        'id',
+        'requestor',
+        'request_type',
+        'title',
+        'status',
+        'priority',
+        'created_at',
+        'reviewed_by'
+    )
+
+    list_filter = (
+        'status',
+        'request_type',
+        'priority',
+        'created_at'
+    )
+
+    search_fields = (
+        'requestor__db_key',
+        'title',
+        'description'
+    )
+
+    readonly_fields = ('created_at', 'reviewed_at')
+
+    fieldsets = (
+        ('Request Info', {
+            'fields': (
+                'requestor',
+                'request_type',
+                'title',
+                'description',
+                'request_data'
+            )
+        }),
+        ('Status', {
+            'fields': ('status', 'priority')
+        }),
+        ('Review', {
+            'fields': ('reviewed_by', 'review_notes', 'reviewed_at')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at',),
+            'classes': ['collapse']
+        }),
+    )
+
+
+@admin.register(CharacterGenerationRequest)
+class CharacterGenerationRequestAdmin(admin.ModelAdmin):
+    """Admin interface for character generation requests."""
+
+    list_display = (
+        'character_name',
+        'vocation',
+        'race',
+        'social_rank',
+        'stats_valid',
+        'skills_valid',
+        'request_status'
+    )
+
+    list_filter = (
+        'vocation',
+        'race',
+        'social_rank',
+        'stats_valid',
+        'skills_valid',
+        'unified_request__status'
+    )
+
+    search_fields = (
+        'character_name',
+        'background',
+        'unified_request__requestor__db_key'
+    )
+
+    readonly_fields = ('stats_valid', 'skills_valid', 'validation_errors')
+
+    fieldsets = (
+        ('Character Concept', {
+            'fields': (
+                'unified_request',
+                'character_name',
+                'vocation',
+                'race',
+                'country',
+                'social_rank'
+            )
+        }),
+        ('Allocations', {
+            'fields': (
+                'stats_allocation',
+                'skills_allocation'
+            )
+        }),
+        ('Background', {
+            'fields': ('background',)
+        }),
+        ('Validation', {
+            'fields': (
+                'stats_valid',
+                'skills_valid',
+                'validation_errors'
+            ),
+            'classes': ['collapse']
+        }),
+    )
+
+    def request_status(self, obj):
+        """Get the status from unified request."""
+        return obj.unified_request.status
+    request_status.short_description = 'Status'
 
 
 # Import additional admin classes
