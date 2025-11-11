@@ -38,6 +38,12 @@ from commands.mission_commands import (
 from commands.room_commands import (
     CmdRoom
 )
+from commands.social_commands import (
+    CmdSocialStart,
+    CmdSocialAction,
+    CmdSocialStance,
+    CmdSocialStatus
+)
 
 
 class CharacterCmdSet(default_cmds.CharacterCmdSet):
@@ -80,6 +86,12 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
 
         # Add Witcher RPG room commands
         self.add(CmdRoom())
+
+        # Add Witcher RPG social combat commands
+        self.add(CmdSocialStart())
+        self.add(CmdSocialAction())
+        self.add(CmdSocialStance())
+        self.add(CmdSocialStatus())
 
 
 class AccountCmdSet(default_cmds.AccountCmdSet):

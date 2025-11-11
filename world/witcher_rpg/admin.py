@@ -31,6 +31,11 @@ from .room_models import (
     ExtractionResource,
     BiomeMobTemplate
 )
+from .social_models import (
+    SocialEncounter,
+    SocialParticipant,
+    SocialAction
+)
 
 
 class VocationFeatInline(admin.TabularInline):
@@ -487,6 +492,113 @@ class CombatParticipantAdmin(admin.ModelAdmin):
             obj.max_hp
         )
     hp_display.short_description = 'HP'
+
+
+# Social Combat System Admin
+
+class SocialParticipantInline(admin.TabularInline):
+    """Inline for social combat participants."""
+    model = SocialParticipant
+    extra = 0
+    fields = [
+        'character', 'initiative_order', 'current_social_capital', 'max_social_capital',
+        'stance', 'wealth_level', 'is_active'
+    ]
+    readonly_fields = ['initiative_order']
+
+
+@admin.register(SocialEncounter)
+class SocialEncounterAdmin(admin.ModelAdmin):
+    """Admin for managing social encounters."""
+    list_display = ['name', 'encounter_type', 'location', 'current_round', 'is_active', 'created_at']
+    list_filter = ['encounter_type', 'is_active', 'created_at']
+    search_fields = ['name']
+    readonly_fields = ['created_at', 'updated_at']
+    inlines = [SocialParticipantInline]
+
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name', 'location', 'encounter_type', 'is_active')
+        }),
+        ('Encounter State', {
+            'fields': ('current_round', 'current_turn_index')
+        }),
+        ('Stakes', {
+            'fields': ('stakes',),
+            'classes': ['collapse']
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ['collapse']
+        }),
+    )
+
+
+@admin.register(SocialParticipant)
+class SocialParticipantAdmin(admin.ModelAdmin):
+    """Admin for individual social participants."""
+    list_display = [
+        'character', 'encounter', 'initiative_order',
+        'capital_display', 'stance', 'wealth_level', 'is_active'
+    ]
+    list_filter = ['stance', 'is_active', 'wealth_level', 'encounter']
+    search_fields = ['character__db_key']
+
+    fieldsets = (
+        ('Basic Info', {
+            'fields': ('encounter', 'character', 'is_active')
+        }),
+        ('Initiative', {
+            'fields': ('initiative_roll', 'initiative_order')
+        }),
+        ('Social Capital', {
+            'fields': ('current_social_capital', 'max_social_capital')
+        }),
+        ('Combat State', {
+            'fields': ('stance', 'wealth_level')
+        }),
+        ('Statistics', {
+            'fields': ('total_damage_dealt', 'total_damage_taken'),
+            'classes': ['collapse']
+        }),
+    )
+
+    def capital_display(self, obj):
+        percent = (obj.current_social_capital / obj.max_social_capital * 100) if obj.max_social_capital > 0 else 0
+        color = 'green' if percent > 60 else 'orange' if percent > 30 else 'red'
+        return format_html(
+            '<span style="color: {};">{}/{}</span>',
+            color,
+            obj.current_social_capital,
+            obj.max_social_capital
+        )
+    capital_display.short_description = 'Social Capital'
+
+
+@admin.register(SocialAction)
+class SocialActionAdmin(admin.ModelAdmin):
+    """Admin for social actions."""
+    list_display = ['name', 'action_type', 'primary_stat', 'secondary_stat', 'base_difficulty', 'damage_dice']
+    list_filter = ['action_type', 'primary_stat']
+    search_fields = ['name', 'description']
+
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name', 'description', 'action_type')
+        }),
+        ('Stats', {
+            'fields': ('primary_stat', 'secondary_stat', 'base_difficulty', 'damage_dice')
+        }),
+        ('Restrictions', {
+            'fields': ('allowed_stances', 'allowed_encounter_types'),
+            'classes': ['collapse']
+        }),
+        ('Bonus Effects', {
+            'fields': ('bonus_effects',),
+            'classes': ['collapse']
+        }),
+    )
+
 
 # Import additional admin classes
 from .admin_items_rooms import *
