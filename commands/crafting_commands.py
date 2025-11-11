@@ -224,14 +224,80 @@ class CmdCraft(Command):
             )
             return
 
-        # TODO: Check for materials in inventory
-        # TODO: Check for workshop location
-        # For now, we'll assume materials and workshop are available
+        # Check for workshop location
+        from world.witcher_rpg.room_models import WitcherRoom
+        if not caller.location:
+            caller.msg("|rYou must be in a location to craft.|n")
+            return
 
-        # Calculate difficulty
-        # For now, assume Tier II materials (-10 CR)
-        material_quality = 2  # TODO: Calculate from actual materials
-        adjusted_difficulty = recipe.calculate_adjusted_difficulty(material_quality)
+        try:
+            witcher_room = WitcherRoom.objects.get(room_object=caller.location)
+        except WitcherRoom.DoesNotExist:
+            caller.msg("|rThis location does not support crafting.|n")
+            caller.msg(f"Required workshop: {recipe.required_workshop}")
+            return
+
+        # Verify it's the right type of workshop
+        is_valid, workshop_reason = witcher_room.is_valid_workshop(caller)
+        if not is_valid:
+            caller.msg(f"|r{workshop_reason}|n")
+            caller.msg(f"Required workshop: {recipe.required_workshop}")
+            return
+
+        # Check for materials in inventory
+        from world.witcher_rpg.item_models import ItemTemplate, InventoryItem
+        missing_materials = []
+        for material_name, needed_qty in recipe.required_materials.items():
+            material_template = ItemTemplate.objects.filter(
+                name=material_name
+            ).first()
+
+            if not material_template:
+                missing_materials.append(f"Unknown material: {material_name}")
+                continue
+
+            owned = InventoryItem.objects.filter(
+                owner=caller,
+                template=material_template
+            ).aggregate(
+                total=sum('quantity')
+            )['total'] or 0
+
+            if owned < needed_qty:
+                missing_materials.append(
+                    f"{material_name}: need {needed_qty}, have {owned}"
+                )
+
+        if missing_materials:
+            caller.msg("|rInsufficient materials!|n")
+            for msg in missing_materials:
+                caller.msg(f"  - {msg}")
+            return
+
+        # Calculate material quality reduction
+        total_reduction = 0
+        material_details = []
+        for material_name, needed_qty in recipe.required_materials.items():
+            material_template = ItemTemplate.objects.filter(
+                name=material_name
+            ).first()
+
+            if material_template:
+                # Get material quality bonus
+                quality_bonus = getattr(material_template, 'material_quality_bonus', 0)
+                reduction = quality_bonus * needed_qty
+                total_reduction += reduction
+
+                material_details.append({
+                    'name': material_name,
+                    'quantity': needed_qty,
+                    'tier': material_template.get_tier_display(),
+                    'quality_bonus': quality_bonus,
+                    'total_reduction': reduction
+                })
+
+        # Calculate final difficulty
+        adjusted_difficulty = max(5, recipe.base_difficulty - total_reduction)
 
         # Apply Artisan Master Craftsman feat (-10 CR, +2 to roll)
         is_artisan = False
@@ -288,6 +354,20 @@ class CmdCraft(Command):
             character.gold -= recipe.gold_cost
             character.save()
 
+            # Consume materials
+            self._consume_materials(caller, recipe.required_materials)
+
+            # Create the crafted item
+            if recipe.result_item:
+                crafted_item = InventoryItem.objects.create(
+                    template=recipe.result_item,
+                    owner=caller,
+                    quantity=1
+                )
+                lines.append(f"|gCrafted:|n {crafted_item.template.name} added to inventory!")
+            else:
+                lines.append("|y(Item template not linked - XP awarded but no item created)|n")
+
             # Log attempt
             CraftingAttempt.objects.create(
                 character=caller,
@@ -299,16 +379,22 @@ class CmdCraft(Command):
                 xp_gained=recipe.xp_reward
             )
 
-            # TODO: Create actual item and add to inventory
-
         else:
             lines.append("|rFAILURE!|n")
             lines.append(f"Your crafting attempt failed.")
 
             if is_artisan:
                 lines.append("|yQuality Control:|n Materials only 50% consumed!")
+                # Consume 50% of materials (round up)
+                reduced_materials = {
+                    mat: max(1, (qty + 1) // 2)
+                    for mat, qty in recipe.required_materials.items()
+                }
+                self._consume_materials(caller, reduced_materials)
             else:
                 lines.append("Materials consumed with no result.")
+                # Consume all materials
+                self._consume_materials(caller, recipe.required_materials)
 
             # Deduct gold (workshop fees)
             character.gold -= recipe.gold_cost
@@ -325,10 +411,47 @@ class CmdCraft(Command):
                 xp_gained=0
             )
 
-            # TODO: Consume materials from inventory (50% for artisan, 100% for others)
-
         lines.append("=" * 70)
         caller.msg("\n".join(lines))
+
+    def _consume_materials(self, character, materials_dict):
+        """
+        Consume materials from character's inventory.
+
+        Args:
+            character: Character object (caller)
+            materials_dict: Dict of {material_name: quantity}
+        """
+        from world.witcher_rpg.item_models import ItemTemplate, InventoryItem
+
+        for material_name, needed_qty in materials_dict.items():
+            material_template = ItemTemplate.objects.filter(
+                name=material_name
+            ).first()
+
+            if not material_template:
+                continue
+
+            # Get all inventory items of this material
+            materials = InventoryItem.objects.filter(
+                owner=character,
+                template=material_template
+            ).order_by('acquired_date')
+
+            remaining = needed_qty
+            for item in materials:
+                if remaining <= 0:
+                    break
+
+                if item.quantity <= remaining:
+                    # Consume entire stack
+                    remaining -= item.quantity
+                    item.delete()
+                else:
+                    # Consume part of stack
+                    item.quantity -= remaining
+                    item.save()
+                    remaining = 0
 
 
 class CmdLearnRecipe(Command):

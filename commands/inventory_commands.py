@@ -140,7 +140,7 @@ class CmdEquip(Command):
     """
 
     key = "equip"
-    aliases = []
+    aliases = ["wear", "wield"]
     locks = "cmd:all()"
     help_category = "Inventory"
 
