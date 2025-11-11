@@ -54,9 +54,11 @@ class CmdIncome(Command):
 
         # Try to collect from each membership
         lines = []
+        lines.append("")
         lines.append("=" * 70)
         lines.append("Monthly Income Collection")
         lines.append("=" * 70)
+        lines.append("")
 
         total_collected = 0
         collected_count = 0
@@ -98,6 +100,7 @@ class CmdIncome(Command):
         else:
             lines.append("|yNo income collected this time.|n")
         lines.append("=" * 70)
+        lines.append("")
 
         caller.msg("\n".join(lines))
 
@@ -158,9 +161,11 @@ class CmdOrganizations(Command):
 
         # List organizations
         lines = []
+        lines.append("")
         lines.append("=" * 80)
         lines.append("Available Organizations")
         lines.append("=" * 80)
+        lines.append("")
         lines.append(f"{'Name':<30} {'Type':<25} {'Members':<10} {'Leader':<15}")
         lines.append("-" * 80)
 
@@ -176,8 +181,10 @@ class CmdOrganizations(Command):
             )
 
         lines.append("=" * 80)
+        lines.append("")
         lines.append("Use |w+organizations <name>|n to view details about an organization.")
         lines.append("Use |w+orgjoin <name>|n to request membership.")
+        lines.append("")
 
         caller.msg("\n".join(lines))
 
@@ -186,9 +193,11 @@ class CmdOrganizations(Command):
         caller = self.caller
 
         lines = []
+        lines.append("")
         lines.append("=" * 70)
         lines.append(f"{org.name}")
         lines.append("=" * 70)
+        lines.append("")
 
         # Basic info
         lines.append(f"|wType:|n {org.get_organization_type_display()}")
@@ -243,7 +252,9 @@ class CmdOrganizations(Command):
         else:
             lines.append("  None")
 
+        lines.append("")
         lines.append("=" * 70)
+        lines.append("")
 
         # Check if caller is a member
         try:
@@ -257,6 +268,7 @@ class CmdOrganizations(Command):
             if org.is_active:
                 lines.append("Use |w+orgjoin " + org.name + "|n to request membership.")
 
+        lines.append("")
         caller.msg("\n".join(lines))
 
 
@@ -540,9 +552,11 @@ class CmdOrgManage(Command):
     def _view_management(self, org, caller):
         """View organization management panel."""
         lines = []
+        lines.append("")
         lines.append("=" * 70)
         lines.append(f"Managing: {org.name}")
         lines.append("=" * 70)
+        lines.append("")
 
         # Organization stats
         lines.append(f"|wTreasury:|n {org.treasury:,} crowns")
@@ -572,7 +586,9 @@ class CmdOrgManage(Command):
         lines.append(f"  +orgmanage {org.name}/kick <member>")
         lines.append(f"  +orgmanage {org.name}/transfer <member>")
 
+        lines.append("")
         lines.append("=" * 70)
+        lines.append("")
         caller.msg("\n".join(lines))
 
     def _change_rank(self, org, caller):
