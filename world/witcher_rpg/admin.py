@@ -11,6 +11,13 @@ from .models import (
     CharacterSkills,
     WitcherCharacter
 )
+from .combat_models import (
+    Race,
+    WitcherStyle,
+    MagicElement,
+    CombatEncounter,
+    CombatParticipant
+)
 
 
 class VocationFeatInline(admin.TabularInline):
@@ -344,3 +351,126 @@ class WitcherCharacterAdmin(admin.ModelAdmin):
             obj.skills = skills
 
         super().save_model(request, obj, form, change)
+
+
+# Combat System Admin
+
+@admin.register(Race)
+class RaceAdmin(admin.ModelAdmin):
+    """Admin for race management."""
+    list_display = ['name', 'magic_cr_modifier', 'damage_taken_modifier']
+    fields = ['name', 'description', 'magic_cr_modifier', 'damage_taken_modifier']
+
+
+@admin.register(WitcherStyle)
+class WitcherStyleAdmin(admin.ModelAdmin):
+    """Admin for Witcher fighting styles."""
+    list_display = ['name', 'stat_bonuses_display']
+    fields = [
+        'name', 'description',
+        ('agility_bonus', 'reflexes_bonus'),
+        ('strength_bonus', 'endurance_bonus', 'perception_bonus'),
+        'special_ability'
+    ]
+
+    def stat_bonuses_display(self, obj):
+        bonuses = []
+        if obj.agility_bonus: bonuses.append(f"AGI+{obj.agility_bonus}")
+        if obj.reflexes_bonus: bonuses.append(f"REF+{obj.reflexes_bonus}")
+        if obj.strength_bonus: bonuses.append(f"STR+{obj.strength_bonus}")
+        if obj.endurance_bonus: bonuses.append(f"END+{obj.endurance_bonus}")
+        if obj.perception_bonus: bonuses.append(f"PER+{obj.perception_bonus}")
+        return ', '.join(bonuses) if bonuses else 'None'
+    stat_bonuses_display.short_description = 'Stat Bonuses'
+
+
+@admin.register(MagicElement)
+class MagicElementAdmin(admin.ModelAdmin):
+    """Admin for magic elements."""
+    list_display = ['name', 'description']
+    fields = ['name', 'description']
+
+
+class CombatParticipantInline(admin.TabularInline):
+    """Inline for combat participants."""
+    model = CombatParticipant
+    extra = 0
+    fields = [
+        'character', 'initiative_order', 'current_hp', 'max_hp',
+        'stance', 'is_active'
+    ]
+    readonly_fields = ['initiative_order']
+
+
+@admin.register(CombatEncounter)
+class CombatEncounterAdmin(admin.ModelAdmin):
+    """Admin for managing combat encounters."""
+    list_display = ['name', 'location', 'current_round', 'is_active', 'created_at']
+    list_filter = ['is_active', 'created_at']
+    search_fields = ['name']
+    readonly_fields = ['created_at', 'updated_at']
+    inlines = [CombatParticipantInline]
+
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name', 'location', 'is_active')
+        }),
+        ('Combat State', {
+            'fields': ('current_round', 'current_turn_index')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ['collapse']
+        }),
+    )
+
+
+@admin.register(CombatParticipant)
+class CombatParticipantAdmin(admin.ModelAdmin):
+    """Admin for individual combat participants."""
+    list_display = [
+        'character', 'encounter', 'initiative_order',
+        'hp_display', 'stance', 'is_active'
+    ]
+    list_filter = ['stance', 'is_active', 'encounter']
+    search_fields = ['character__db_key']
+
+    fieldsets = (
+        ('Basic Info', {
+            'fields': ('encounter', 'character', 'is_active')
+        }),
+        ('Initiative', {
+            'fields': ('initiative_roll', 'initiative_order')
+        }),
+        ('Health', {
+            'fields': ('current_hp', 'max_hp', 'armor_value')
+        }),
+        ('Combat State', {
+            'fields': (
+                'stance',
+                'last_attack_type',
+                'recovery_penalty'
+            )
+        }),
+        ('Spell Casting', {
+            'fields': (
+                'is_casting',
+                'spell_turns_remaining',
+                'spell_name',
+                'spell_difficulty',
+                'spell_element'
+            ),
+            'classes': ['collapse']
+        }),
+    )
+
+    def hp_display(self, obj):
+        percent = (obj.current_hp / obj.max_hp * 100) if obj.max_hp > 0 else 0
+        color = 'green' if percent > 60 else 'orange' if percent > 30 else 'red'
+        return format_html(
+            '<span style="color: {};">{}/{}</span>',
+            color,
+            obj.current_hp,
+            obj.max_hp
+        )
+    hp_display.short_description = 'HP'

@@ -335,6 +335,29 @@ class WitcherCharacter(models.Model):
         help_text="Character background and history"
     )
 
+    # Race and combat specialization
+    race = models.CharField(
+        max_length=50,
+        choices=[('human', 'Human'), ('elf', 'Elf'), ('dwarf', 'Dwarf')],
+        default='human',
+        help_text="Character's race"
+    )
+    witcher_style = models.CharField(
+        max_length=50,
+        choices=[
+            ('none', 'None'),
+            ('cat', 'School of the Cat'),
+            ('viper', 'School of the Viper'),
+            ('bear', 'School of the Bear'),
+            ('eagle', 'School of the Eagle'),
+            ('dragon', 'School of the Dragon'),
+            ('basilisk', 'School of the Basilisk'),
+        ],
+        default='none',
+        blank=True,
+        help_text="Witcher school style (only for Witcher vocation)"
+    )
+
     # Experience and progression
     experience_points = models.IntegerField(
         default=0,
@@ -400,3 +423,102 @@ class WitcherCharacter(models.Model):
         Get all feats associated with this character's vocation.
         """
         return self.vocation.feats.all()
+
+    def get_race_modifiers(self):
+        """
+        Get racial modifiers for this character.
+
+        Returns:
+            dict: Racial modifiers
+        """
+        modifiers = {
+            'human': {
+                'magic_cr_modifier': 0,
+                'damage_taken_modifier': 1.0,
+                'description': 'Balanced and adaptable'
+            },
+            'elf': {
+                'magic_cr_modifier': -5,  # Easier spell casting
+                'damage_taken_modifier': 1.2,  # Takes more damage
+                'description': 'Natural magical affinity but fragile'
+            },
+            'dwarf': {
+                'magic_cr_modifier': 5,  # Harder spell casting
+                'damage_taken_modifier': 0.8,  # Takes less damage
+                'description': 'Sturdy and resilient but magically resistant'
+            }
+        }
+        return modifiers.get(self.race, modifiers['human'])
+
+    def get_witcher_style_bonuses(self):
+        """
+        Get bonuses from Witcher fighting style.
+
+        Returns:
+            dict: Style bonuses or None if not a Witcher or no style chosen
+        """
+        if self.witcher_style == 'none' or self.vocation.name != 'witcher':
+            return None
+
+        styles = {
+            'cat': {
+                'agility': 2,
+                'reflexes': 1,
+                'description': 'Fast and agile, focused on speed and precision',
+                'special': 'Extra dodge chance in light armor'
+            },
+            'viper': {
+                'cunning': 2,
+                'agility': 1,
+                'description': 'Deceptive and tactical, uses poisons and traps',
+                'special': 'Bonus to alchemy when crafting poisons'
+            },
+            'bear': {
+                'strength': 2,
+                'endurance': 2,
+                'agility': -1,
+                'description': 'Powerful and heavily armored, trades speed for durability',
+                'special': 'Can wear heavy armor without penalty'
+            },
+            'eagle': {
+                'perception': 2,
+                'wit': 1,
+                'description': 'Tactical and observant, excels at reading opponents',
+                'special': 'Bonus to initiative rolls'
+            },
+            'dragon': {
+                'intelligence': 1,
+                'willpower': 1,
+                'perception': 1,
+                'description': 'Balanced and disciplined, masters of sign magic',
+                'special': 'Enhanced sign intensity'
+            },
+            'basilisk': {
+                'reflexes': 1,
+                'endurance': 1,
+                'wit': 1,
+                'description': 'Adaptable and versatile, quick to adjust tactics',
+                'special': 'Can change stance as a free action once per round'
+            }
+        }
+        return styles.get(self.witcher_style)
+
+    def get_total_effective_stat(self, stat_name):
+        """
+        Get the total effective stat including vocation AND witcher style bonuses.
+
+        Args:
+            stat_name (str): Name of the stat
+
+        Returns:
+            int: Total effective stat
+        """
+        base = self.get_effective_stat(stat_name)  # Includes vocation mods
+
+        # Add Witcher style bonuses if applicable
+        if self.witcher_style != 'none' and self.vocation.name == 'witcher':
+            style_bonuses = self.get_witcher_style_bonuses()
+            if style_bonuses and stat_name in style_bonuses:
+                base += style_bonuses[stat_name]
+
+        return base
