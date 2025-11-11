@@ -329,6 +329,8 @@ class CmdSocialAction(Command):
 
     def _announce_victory(self, location, winner, results):
         """Announce the end of the encounter and rewards."""
+        from world.witcher_rpg.shop_system import ShopManager
+
         lines = [
             f"\n|y{'=' * 70}|n",
             f"|gSocial Encounter Complete!|n",
@@ -336,7 +338,35 @@ class CmdSocialAction(Command):
             f"|y{'=' * 70}|n"
         ]
 
-        if results['rewards']:
+        # Check if this was a shop haggling encounter
+        shop = ShopManager.get_shop_at_location(location)
+        if shop and shop.merchant:
+            # Check if merchant was defeated
+            defeated_names = [name.lower() for name in results.get('defeated', [])]
+            if shop.merchant.name.lower() in defeated_names:
+                # Apply shop discount
+                from world.witcher_rpg.social_models import SocialParticipant
+                try:
+                    winner_participant = SocialParticipant.objects.filter(
+                        character=winner
+                    ).order_by('-encounter__created_at').first()
+
+                    if winner_participant:
+                        victory_margin = winner_participant.current_social_capital
+                        discount_result = ShopManager.apply_social_combat_discount(
+                            shop, winner, victory_margin
+                        )
+
+                        # Store discount in temporary attribute
+                        winner.ndb.shop_discount = discount_result['discount_percentage']
+
+                        lines.append(f"\n|g=== Haggling Success! ===|n")
+                        lines.append(discount_result['message'])
+                        lines.append(f"|yUse 'buy' or 'sell' now to apply your discount!|n")
+                except Exception:
+                    pass
+
+        if results.get('rewards'):
             lines.append("\n|g=== Rewards Gained ===|n")
             for reward in results['rewards']:
                 lines.append(f"From |c{reward['from']}|n:")

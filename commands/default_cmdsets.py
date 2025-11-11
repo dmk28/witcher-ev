@@ -44,6 +44,13 @@ from commands.social_commands import (
     CmdSocialStance,
     CmdSocialStatus
 )
+from commands.shop_commands import (
+    CmdBrowse,
+    CmdBuy,
+    CmdSell,
+    CmdHaggle,
+    CmdShopManage
+)
 
 
 class CharacterCmdSet(default_cmds.CharacterCmdSet):
@@ -92,6 +99,13 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdSocialAction())
         self.add(CmdSocialStance())
         self.add(CmdSocialStatus())
+
+        # Add Witcher RPG shop commands
+        self.add(CmdBrowse())
+        self.add(CmdBuy())
+        self.add(CmdSell())
+        self.add(CmdHaggle())
+        self.add(CmdShopManage())
 
 
 class AccountCmdSet(default_cmds.AccountCmdSet):

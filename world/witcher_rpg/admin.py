@@ -36,6 +36,12 @@ from .social_models import (
     SocialParticipant,
     SocialAction
 )
+from .shop_models import (
+    Shop,
+    ShopInventory,
+    ShopTransaction,
+    ShopRestockRule
+)
 
 
 class VocationFeatInline(admin.TabularInline):
@@ -595,6 +601,111 @@ class SocialActionAdmin(admin.ModelAdmin):
         }),
         ('Bonus Effects', {
             'fields': ('bonus_effects',),
+            'classes': ['collapse']
+        }),
+    )
+
+
+# Shop System Admin
+
+class ShopInventoryInline(admin.TabularInline):
+    """Inline for shop inventory."""
+    model = ShopInventory
+    extra = 0
+    fields = ['item_template', 'quantity', 'base_price', 'is_special']
+    readonly_fields = ['added_at']
+
+
+@admin.register(Shop)
+class ShopAdmin(admin.ModelAdmin):
+    """Admin for managing shops."""
+    list_display = ['name', 'shop_type', 'tier', 'faction', 'gold_reserves', 'is_open']
+    list_filter = ['shop_type', 'tier', 'faction', 'is_open']
+    search_fields = ['name', 'location__db_key']
+    readonly_fields = ['last_restock', 'created_at', 'updated_at']
+    inlines = [ShopInventoryInline]
+
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name', 'location', 'shop_type', 'tier', 'faction', 'is_open')
+        }),
+        ('Ownership', {
+            'fields': ('owner', 'merchant')
+        }),
+        ('Financial', {
+            'fields': ('gold_reserves', 'markup_percentage', 'buyback_percentage')
+        }),
+        ('Restocking', {
+            'fields': ('last_restock', 'restock_interval_hours')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ['collapse']
+        }),
+    )
+
+
+@admin.register(ShopInventory)
+class ShopInventoryAdmin(admin.ModelAdmin):
+    """Admin for shop inventory."""
+    list_display = ['item_template', 'shop', 'quantity', 'base_price', 'is_special']
+    list_filter = ['is_special', 'shop__shop_type', 'shop']
+    search_fields = ['item_template__name', 'shop__name']
+
+    fieldsets = (
+        ('Basic Info', {
+            'fields': ('shop', 'item_template', 'quantity')
+        }),
+        ('Pricing', {
+            'fields': ('base_price', 'is_special')
+        }),
+        ('Timestamps', {
+            'fields': ('added_at',),
+            'classes': ['collapse']
+        }),
+    )
+
+
+@admin.register(ShopTransaction)
+class ShopTransactionAdmin(admin.ModelAdmin):
+    """Admin for shop transactions."""
+    list_display = ['shop', 'customer', 'transaction_type', 'item_name', 'quantity', 'total_price', 'timestamp']
+    list_filter = ['transaction_type', 'shop', 'timestamp']
+    search_fields = ['item_name', 'customer__db_key', 'shop__name']
+    readonly_fields = ['timestamp']
+
+    fieldsets = (
+        ('Transaction Info', {
+            'fields': ('shop', 'customer', 'transaction_type', 'timestamp')
+        }),
+        ('Details', {
+            'fields': ('item_name', 'quantity', 'price_per_item', 'total_price')
+        }),
+        ('Social Combat', {
+            'fields': ('social_discount',)
+        }),
+    )
+
+
+@admin.register(ShopRestockRule)
+class ShopRestockRuleAdmin(admin.ModelAdmin):
+    """Admin for shop restock rules."""
+    list_display = ['item_template', 'shop_type', 'min_tier', 'max_tier', 'stock_chance', 'min_quantity', 'max_quantity']
+    list_filter = ['shop_type', 'min_tier', 'max_tier']
+    search_fields = ['item_template__name']
+
+    fieldsets = (
+        ('Basic Info', {
+            'fields': ('shop_type', 'item_template')
+        }),
+        ('Tier Range', {
+            'fields': ('min_tier', 'max_tier')
+        }),
+        ('Stocking Parameters', {
+            'fields': ('stock_chance', 'min_quantity', 'max_quantity')
+        }),
+        ('Faction Restrictions', {
+            'fields': ('allowed_factions', 'restricted_factions'),
             'classes': ['collapse']
         }),
     )
