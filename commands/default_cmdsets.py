@@ -81,6 +81,16 @@ from commands.building_commands import (
     CmdRoomPurpose,
     CmdSellRoom
 )
+from commands.income_commands import (
+    CmdIncome,
+    CmdOrganizations,
+    CmdOrgJoin,
+    CmdOrgLeave,
+    CmdOrgInvest,
+    CmdOrgManage,
+    CmdOrgCreate,
+    CmdOrgEdit
+)
 
 
 class CharacterCmdSet(default_cmds.CharacterCmdSet):
@@ -168,6 +178,18 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdMyRooms())
         self.add(CmdRoomPurpose())
         self.add(CmdSellRoom())
+
+        # Add Witcher RPG income/organization commands
+        # Player commands
+        self.add(CmdIncome())
+        self.add(CmdOrganizations())
+        self.add(CmdOrgJoin())
+        self.add(CmdOrgLeave())
+        self.add(CmdOrgInvest())
+        self.add(CmdOrgManage())
+        # GM commands
+        self.add(CmdOrgCreate())
+        self.add(CmdOrgEdit())
 
 
 class AccountCmdSet(default_cmds.AccountCmdSet):

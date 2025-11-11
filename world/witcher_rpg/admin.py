@@ -57,6 +57,11 @@ from .request_models import (
     UnifiedRequest,
     CharacterGenerationRequest
 )
+from .organization_models import (
+    Organization,
+    OrganizationMembership,
+    IncomeLog
+)
 
 
 class VocationFeatInline(admin.TabularInline):
@@ -1149,6 +1154,206 @@ class CharacterGenerationRequestAdmin(admin.ModelAdmin):
         """Get the status from unified request."""
         return obj.unified_request.status
     request_status.short_description = 'Status'
+
+
+# ============================================================
+# Organization and Income System Admin
+# ============================================================
+
+class OrganizationMembershipInline(admin.TabularInline):
+    """Inline for organization members."""
+    model = OrganizationMembership
+    extra = 0
+    fields = [
+        'member', 'organization_rank', 'role', 'personal_investment',
+        'is_active', 'is_approved'
+    ]
+    readonly_fields = ['joined_date']
+
+
+@admin.register(Organization)
+class OrganizationAdmin(admin.ModelAdmin):
+    """Admin interface for organizations."""
+
+    list_display = (
+        'name',
+        'organization_type',
+        'leader_name',
+        'member_count',
+        'treasury',
+        'is_active'
+    )
+
+    list_filter = (
+        'organization_type',
+        'is_active',
+        'requires_approval'
+    )
+
+    search_fields = ('name', 'description')
+
+    readonly_fields = ('created_date', 'member_count_display')
+
+    inlines = [OrganizationMembershipInline]
+
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name', 'organization_type', 'description', 'leader')
+        }),
+        ('Financial', {
+            'fields': (
+                'treasury',
+                'investment_level',
+                'base_income_multiplier'
+            )
+        }),
+        ('Income Distribution', {
+            'fields': (
+                'member_tithe_percentage',
+                'leader_share_percentage'
+            )
+        }),
+        ('Membership Settings', {
+            'fields': ('requires_approval', 'is_active')
+        }),
+        ('Statistics', {
+            'fields': ('member_count_display', 'created_date'),
+            'classes': ['collapse']
+        }),
+    )
+
+    def leader_name(self, obj):
+        """Display leader's name."""
+        return obj.leader.db_key if obj.leader else '(None)'
+    leader_name.short_description = 'Leader'
+
+    def member_count(self, obj):
+        """Display active member count."""
+        return obj.get_member_count()
+    member_count.short_description = 'Members'
+
+    def member_count_display(self, obj):
+        """Detailed member count display."""
+        active = obj.memberships.filter(is_active=True).count()
+        pending = obj.memberships.filter(is_active=True, is_approved=False).count()
+        total = obj.memberships.count()
+        return f"Active: {active}, Pending: {pending}, Total: {total}"
+    member_count_display.short_description = 'Membership Details'
+
+
+@admin.register(OrganizationMembership)
+class OrganizationMembershipAdmin(admin.ModelAdmin):
+    """Admin interface for organization memberships."""
+
+    list_display = (
+        'member_name',
+        'organization',
+        'organization_rank',
+        'role',
+        'income_display',
+        'is_active',
+        'is_approved'
+    )
+
+    list_filter = (
+        'organization__organization_type',
+        'organization_rank',
+        'is_active',
+        'is_approved'
+    )
+
+    search_fields = (
+        'member__db_key',
+        'organization__name',
+        'role'
+    )
+
+    readonly_fields = ('joined_date', 'next_collection_date')
+
+    fieldsets = (
+        ('Membership Info', {
+            'fields': ('organization', 'member', 'is_active', 'is_approved')
+        }),
+        ('Position', {
+            'fields': ('organization_rank', 'role')
+        }),
+        ('Investment', {
+            'fields': ('personal_investment',)
+        }),
+        ('Income Tracking', {
+            'fields': ('last_income_collection', 'next_collection_date')
+        }),
+        ('Timestamps', {
+            'fields': ('joined_date',),
+            'classes': ['collapse']
+        }),
+    )
+
+    def member_name(self, obj):
+        """Display member's name."""
+        return obj.member.db_key
+    member_name.short_description = 'Member'
+
+    def income_display(self, obj):
+        """Display monthly income."""
+        income = obj.calculate_total_income()
+        return format_html(
+            '<span style="color: green;">{:,} crowns/mo</span>',
+            income
+        )
+    income_display.short_description = 'Monthly Income'
+
+    def next_collection_date(self, obj):
+        """Display when income can next be collected."""
+        can_collect, hours_remaining = obj.can_collect_income()
+        if can_collect:
+            return "Available now"
+        else:
+            days = hours_remaining // 24
+            hours = hours_remaining % 24
+            return f"{days} days, {hours} hours"
+    next_collection_date.short_description = 'Next Collection'
+
+
+@admin.register(IncomeLog)
+class IncomeLogAdmin(admin.ModelAdmin):
+    """Admin interface for income logs."""
+
+    list_display = (
+        'character_name',
+        'organization',
+        'amount',
+        'source',
+        'timestamp'
+    )
+
+    list_filter = (
+        'organization',
+        'source',
+        'timestamp'
+    )
+
+    search_fields = (
+        'character__db_key',
+        'organization__name',
+        'source'
+    )
+
+    readonly_fields = ('timestamp',)
+
+    fieldsets = (
+        ('Income Info', {
+            'fields': ('character', 'organization', 'amount', 'source')
+        }),
+        ('Timestamp', {
+            'fields': ('timestamp',)
+        }),
+    )
+
+    def character_name(self, obj):
+        """Display character's name."""
+        return obj.character.db_key
+    character_name.short_description = 'Character'
 
 
 # Import additional admin classes
