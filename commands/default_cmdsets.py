@@ -69,7 +69,6 @@ from commands.request_commands import (
     CmdGMRequests,
     CmdApproveRequest,
     CmdDenyRequest,
-    CmdViewRequest,
     CmdMyRequests
 )
 
@@ -146,7 +145,6 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdGMRequests())
         self.add(CmdApproveRequest())
         self.add(CmdDenyRequest())
-        self.add(CmdViewRequest())
         self.add(CmdMyRequests())
 
 

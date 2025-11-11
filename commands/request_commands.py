@@ -88,49 +88,66 @@ class CmdGMRequests(Command):
     View all pending GM approval requests (GM only).
 
     Usage:
-      gmrequests
-      gmrequests [pending|approved|denied|all]
-      gmrequests chargen
-      gmrequests advancement
+      +grequest
+      +grequest/pending
+      +grequest/approved
+      +grequest/denied
+      +grequest/all
+      +grequest/chargen
+      +grequest/advancement
+      +grequest/view <id>
 
-    Shows all requests by status or type. Without arguments, shows
+    Shows all requests in a table format. Without arguments, shows
     only pending requests.
 
     Filters:
-      pending    - Only pending requests (default)
-      approved   - Only approved requests
-      denied     - Only denied requests
-      all        - All requests regardless of status
+      /pending    - Only pending requests (default)
+      /approved   - Only approved requests
+      /denied     - Only denied requests
+      /all        - All requests regardless of status
 
     Request types:
-      chargen             - Character generation
-      advancement_stat    - Stat advancement (6-7)
-      advancement_skill   - Skill advancement (6-7)
-      special_item        - Special item request
-      plot_hook           - Plot hook request
-      custom              - Custom request
+      /chargen             - Character generation
+      /advancement_stat    - Stat advancement (6-7)
+      /advancement_skill   - Skill advancement (6-7)
+      /advancement         - All advancement requests
+      /special_item        - Special item request
+      /plot_hook           - Plot hook request
+      /custom              - Custom request
 
-    Use |wapprovereq <id>|n to approve a request
-    Use |wdenyreq <id> <reason>|n to deny a request
+    View full request:
+      +grequest/view <id>  - View complete request details
+
+    Use |w+grequest/approve <id> [notes]|n to approve a request
+    Use |w+grequest/deny <id> <reason>|n to deny a request
     """
 
-    key = "gmrequests"
-    aliases = ["requests", "approvalrequests"]
+    key = "+grequest"
+    aliases = ["gmrequests", "+grequests"]
     locks = "cmd:perm(Builder)"
     help_category = "GM"
 
     def func(self):
-        # Parse filter
+        # Handle /view switch
+        if self.switches and 'view' in self.switches:
+            if not self.args:
+                self.caller.msg("Usage: +grequest/view <id>")
+                return
+            # Delegate to view function
+            self._view_request(self.args.strip())
+            return
+
+        # Parse filter from switches
         filter_status = 'pending'
         filter_type = None
 
-        if self.args:
-            arg = self.args.strip().lower()
-            if arg in ['pending', 'approved', 'denied', 'all']:
-                filter_status = arg
-            elif arg in ['chargen', 'advancement_stat', 'advancement_skill',
-                        'special_item', 'plot_hook', 'custom', 'advancement']:
-                filter_type = arg
+        if self.switches:
+            switch = self.switches[0].lower()
+            if switch in ['pending', 'approved', 'denied', 'all']:
+                filter_status = switch
+            elif switch in ['chargen', 'advancement_stat', 'advancement_skill',
+                          'special_item', 'plot_hook', 'custom', 'advancement']:
+                filter_type = switch
                 filter_status = 'all'
 
         # Get requests
@@ -157,81 +174,158 @@ class CmdGMRequests(Command):
                 self.caller.msg(f"No {filter_status} requests found.")
             return
 
-        # Build output
+        # Build table output
         lines = []
-        lines.append("=" * 70)
+        lines.append("=" * 100)
         if filter_status == 'pending':
             lines.append(f"Pending GM Approval Requests ({requests.count()})")
         else:
-            lines.append(f"GM Approval Requests ({requests.count()})")
-        lines.append("=" * 70)
+            lines.append(f"GM Approval Requests - {filter_status.upper()} ({requests.count()})")
+        lines.append("=" * 100)
+
+        # Table header
+        lines.append(
+            f"{'ID':<5} {'Status':<12} {'Type':<20} {'From':<15} {'Title':<45}"
+        )
+        lines.append("-" * 100)
 
         for request in requests:
             # Status indicator
             if request.status == 'approved':
-                status = "|g[APPROVED]|n"
+                status = "|gAPPROVED|n"
             elif request.status == 'denied':
-                status = "|r[DENIED]|n"
+                status = "|rDENIED|n"
             elif request.status == 'revoked':
-                status = "|y[REVOKED]|n"
+                status = "|yREVOKED|n"
             else:
-                status = "|y[PENDING]|n"
+                status = "|yPENDING|n"
 
             # Priority indicator
+            priority_marker = ""
             if request.priority == 'urgent':
-                priority = "|r[URGENT]|n"
+                priority_marker = "|r!|n"
             elif request.priority == 'high':
-                priority = "|y[HIGH]|n"
-            else:
-                priority = ""
+                priority_marker = "|y!|n"
 
+            # Truncate long fields
+            req_type = request.get_request_type_display()[:18]
+            requestor_name = request.requestor.name[:13]
+            title = request.title[:43]
+
+            lines.append(
+                f"{request.id:<5} {status:<20} {req_type:<20} {requestor_name:<15} {title:<45} {priority_marker}"
+            )
+
+        lines.append("=" * 100)
+        lines.append("\nCommands:")
+        lines.append("  |w+grequest/view <id>|n           - View full request details")
+        lines.append("  |w+grequest/approve <id> [notes]|n - Approve request")
+        lines.append("  |w+grequest/deny <id> <reason>|n   - Deny request")
+        lines.append("=" * 100)
+
+        self.caller.msg("\n".join(lines))
+
+    def _view_request(self, request_id):
+        """View detailed information about a specific request."""
+        try:
+            request = UnifiedRequest.objects.select_related(
+                'requestor', 'reviewed_by'
+            ).get(id=request_id)
+        except UnifiedRequest.DoesNotExist:
+            self.caller.msg(f"Request #{request_id} not found.")
+            return
+        except ValueError:
+            self.caller.msg("Request ID must be a number.")
+            return
+
+        # Build output
+        lines = []
+        lines.append("=" * 70)
+        lines.append(f"Request #{request.id} - {request.get_request_type_display()}")
+        lines.append("=" * 70)
+
+        # Status
+        if request.status == 'approved':
+            status = "|g[APPROVED]|n"
+        elif request.status == 'denied':
+            status = "|r[DENIED]|n"
+        elif request.status == 'revoked':
+            status = "|y[REVOKED]|n"
+        else:
+            status = "|y[PENDING]|n"
+
+        lines.append(f"Status: {status}")
+        lines.append(f"Priority: {request.get_priority_display()}")
+        lines.append(f"Requestor: {request.requestor.name}")
+        lines.append(f"Created: {request.created_at.strftime('%Y-%m-%d %H:%M')}")
+
+        if request.reviewed_by:
+            lines.append(
+                f"Reviewed by: {request.reviewed_by.name} "
+                f"on {request.reviewed_at.strftime('%Y-%m-%d %H:%M')}"
+            )
+
+        lines.append("")
+        lines.append("|wTitle:|n")
+        lines.append(request.title)
+        lines.append("")
+        lines.append("|wDescription:|n")
+        lines.append(request.description)
+
+        # Show request data
+        if request.request_data:
             lines.append("")
-            lines.append(f"|wRequest #{request.id}|n {status} {priority}")
-            lines.append(f"Type: {request.get_request_type_display()}")
-            lines.append(f"From: {request.requestor.name}")
-            lines.append(f"Title: {request.title}")
-            lines.append(f"Submitted: {request.created_at.strftime('%Y-%m-%d %H:%M')}")
+            lines.append("|wRequest Data:|n")
+            for key, value in request.request_data.items():
+                lines.append(f"  {key}: {value}")
 
-            # Show description (truncated)
-            if request.description:
-                desc = request.description[:100]
-                if len(request.description) > 100:
-                    desc += "..."
-                lines.append(f"Description: {desc}")
+        # Show chargen details
+        if request.request_type == 'chargen':
+            try:
+                chargen = request.chargen_details
+                lines.append("")
+                lines.append("|wCharacter Generation Details:|n")
+                lines.append(f"  Name: {chargen.character_name}")
+                lines.append(f"  Vocation: {chargen.vocation.get_name_display()}")
+                lines.append(f"  Race: {chargen.race}")
+                if chargen.country:
+                    lines.append(f"  Country: {chargen.country.get_name_display()}")
+                lines.append(f"  Social Rank: {chargen.get_social_rank_display()}")
+                lines.append("")
+                lines.append("|wStat Allocation:|n")
+                for stat, value in chargen.stats_allocation.items():
+                    lines.append(f"  {stat}: {value}")
+                lines.append("")
+                lines.append("|wSkill Allocation:|n")
+                for skill, value in chargen.skills_allocation.items():
+                    lines.append(f"  {skill}: {value}")
+                lines.append("")
+                lines.append("|wBackground:|n")
+                lines.append(chargen.background)
+                lines.append("")
+                lines.append(f"Stats Valid: {'|gYes|n' if chargen.stats_valid else '|rNo|n'}")
+                lines.append(f"Skills Valid: {'|gYes|n' if chargen.skills_valid else '|rNo|n'}")
+                if chargen.validation_errors:
+                    lines.append("|rValidation Errors:|n")
+                    for error in chargen.validation_errors:
+                        lines.append(f"  - {error}")
+            except Exception as e:
+                lines.append(f"|rError loading chargen details:|n {e}")
 
-            # Show review info if reviewed
-            if request.reviewed_by:
-                lines.append(
-                    f"Reviewed by: {request.reviewed_by.name} "
-                    f"on {request.reviewed_at.strftime('%Y-%m-%d %H:%M')}"
-                )
-                if request.review_notes:
-                    notes = request.review_notes[:80]
-                    if len(request.review_notes) > 80:
-                        notes += "..."
-                    lines.append(f"Notes: {notes}")
-
-            # Show chargen details if applicable
-            if request.request_type == 'chargen':
-                try:
-                    chargen = request.chargen_details
-                    lines.append(
-                        f"  Character: {chargen.character_name} "
-                        f"({chargen.vocation.get_name_display()}, "
-                        f"{chargen.race})"
-                    )
-                    if chargen.validation_errors:
-                        lines.append(f"  |rValidation Errors:|n {len(chargen.validation_errors)}")
-                except:
-                    pass
+        # Show review notes
+        if request.review_notes:
+            lines.append("")
+            lines.append("|wReview Notes:|n")
+            lines.append(request.review_notes)
 
         lines.append("")
         lines.append("=" * 70)
-        lines.append("Commands:")
-        lines.append("  |wapprovereq <id> [notes]|n - Approve request")
-        lines.append("  |wdenyreq <id> <reason>|n - Deny request")
-        lines.append("  |wviewreq <id>|n - View full request details")
-        lines.append("=" * 70)
+
+        if request.status == 'pending':
+            lines.append("Commands:")
+            lines.append(f"  |w+grequest/approve {request.id} [notes]|n - Approve this request")
+            lines.append(f"  |w+grequest/deny {request.id} <reason>|n - Deny this request")
+            lines.append("=" * 70)
 
         self.caller.msg("\n".join(lines))
 
@@ -241,9 +335,9 @@ class CmdApproveRequest(Command):
     Approve a GM approval request (GM only).
 
     Usage:
-      approvereq <request_id> [notes]
-      approvereq 42 Great character concept!
-      approvereq 15
+      +grequest/approve <request_id> [notes]
+      +grequest/approve 42 Great character concept!
+      +grequest/approve 15
 
     Approves a pending request. Depending on the request type:
     - chargen: Creates the character
@@ -254,8 +348,8 @@ class CmdApproveRequest(Command):
     Optional notes will be shown to the player.
     """
 
-    key = "approvereq"
-    aliases = ["approve", "acceptreq"]
+    key = "+grequest/approve"
+    aliases = ["approvereq", "approve"]
     locks = "cmd:perm(Builder)"
     help_category = "GM"
 
@@ -365,15 +459,15 @@ class CmdDenyRequest(Command):
     Deny a GM approval request (GM only).
 
     Usage:
-      denyreq <request_id> <reason>
-      denyreq 42 Need more background detail and in-game justification
+      +grequest/deny <request_id> <reason>
+      +grequest/deny 42 Need more background detail and in-game justification
 
     Denies a pending request with a reason that will be shown to the player.
     The reason should explain what needs improvement or why it was denied.
     """
 
-    key = "denyreq"
-    aliases = ["deny", "rejectreq"]
+    key = "+grequest/deny"
+    aliases = ["denyreq", "deny"]
     locks = "cmd:perm(Builder)"
     help_category = "GM"
 
@@ -431,138 +525,6 @@ class CmdDenyRequest(Command):
             f"Title: {request.title}\n\n"
             f"Player has been notified."
         )
-
-
-class CmdViewRequest(Command):
-    """
-    View detailed information about a specific request.
-
-    Usage:
-      viewreq <request_id>
-      viewreq 42
-
-    Shows complete details about a request including:
-    - Full description
-    - Request data (stats, skills, etc.)
-    - Validation results (for chargen)
-    - Full review notes
-    - History/timeline
-    """
-
-    key = "viewreq"
-    aliases = ["showreq", "requestinfo"]
-    locks = "cmd:perm(Builder)"
-    help_category = "GM"
-
-    def func(self):
-        if not self.args:
-            self.caller.msg("Usage: viewreq <request_id>")
-            return
-
-        request_id = self.args.strip()
-
-        # Get request
-        try:
-            request = UnifiedRequest.objects.select_related(
-                'requestor', 'reviewed_by'
-            ).get(id=request_id)
-        except UnifiedRequest.DoesNotExist:
-            self.caller.msg(f"Request #{request_id} not found.")
-            return
-        except ValueError:
-            self.caller.msg("Request ID must be a number.")
-            return
-
-        # Build output
-        lines = []
-        lines.append("=" * 70)
-        lines.append(f"Request #{request.id} - {request.get_request_type_display()}")
-        lines.append("=" * 70)
-
-        # Status
-        if request.status == 'approved':
-            status = "|g[APPROVED]|n"
-        elif request.status == 'denied':
-            status = "|r[DENIED]|n"
-        elif request.status == 'revoked':
-            status = "|y[REVOKED]|n"
-        else:
-            status = "|y[PENDING]|n"
-
-        lines.append(f"Status: {status}")
-        lines.append(f"Priority: {request.get_priority_display()}")
-        lines.append(f"Requestor: {request.requestor.name}")
-        lines.append(f"Created: {request.created_at.strftime('%Y-%m-%d %H:%M')}")
-
-        if request.reviewed_by:
-            lines.append(
-                f"Reviewed by: {request.reviewed_by.name} "
-                f"on {request.reviewed_at.strftime('%Y-%m-%d %H:%M')}"
-            )
-
-        lines.append("")
-        lines.append("|wTitle:|n")
-        lines.append(request.title)
-        lines.append("")
-        lines.append("|wDescription:|n")
-        lines.append(request.description)
-
-        # Show request data
-        if request.request_data:
-            lines.append("")
-            lines.append("|wRequest Data:|n")
-            for key, value in request.request_data.items():
-                lines.append(f"  {key}: {value}")
-
-        # Show chargen details
-        if request.request_type == 'chargen':
-            try:
-                chargen = request.chargen_details
-                lines.append("")
-                lines.append("|wCharacter Generation Details:|n")
-                lines.append(f"  Name: {chargen.character_name}")
-                lines.append(f"  Vocation: {chargen.vocation.get_name_display()}")
-                lines.append(f"  Race: {chargen.race}")
-                if chargen.country:
-                    lines.append(f"  Country: {chargen.country.get_name_display()}")
-                lines.append(f"  Social Rank: {chargen.get_social_rank_display()}")
-                lines.append("")
-                lines.append("|wStat Allocation:|n")
-                for stat, value in chargen.stats_allocation.items():
-                    lines.append(f"  {stat}: {value}")
-                lines.append("")
-                lines.append("|wSkill Allocation:|n")
-                for skill, value in chargen.skills_allocation.items():
-                    lines.append(f"  {skill}: {value}")
-                lines.append("")
-                lines.append("|wBackground:|n")
-                lines.append(chargen.background)
-                lines.append("")
-                lines.append(f"Stats Valid: {'|gYes|n' if chargen.stats_valid else '|rNo|n'}")
-                lines.append(f"Skills Valid: {'|gYes|n' if chargen.skills_valid else '|rNo|n'}")
-                if chargen.validation_errors:
-                    lines.append("|rValidation Errors:|n")
-                    for error in chargen.validation_errors:
-                        lines.append(f"  - {error}")
-            except Exception as e:
-                lines.append(f"|rError loading chargen details:|n {e}")
-
-        # Show review notes
-        if request.review_notes:
-            lines.append("")
-            lines.append("|wReview Notes:|n")
-            lines.append(request.review_notes)
-
-        lines.append("")
-        lines.append("=" * 70)
-
-        if request.status == 'pending':
-            lines.append("Commands:")
-            lines.append(f"  |wapprovereq {request.id} [notes]|n - Approve this request")
-            lines.append(f"  |wdenyreq {request.id} <reason>|n - Deny this request")
-            lines.append("=" * 70)
-
-        self.caller.msg("\n".join(lines))
 
 
 class CmdMyRequests(Command):
