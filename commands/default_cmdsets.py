@@ -71,6 +71,16 @@ from commands.request_commands import (
     CmdDenyRequest,
     CmdMyRequests
 )
+from commands.building_commands import (
+    CmdRoomCreate,
+    CmdRoomEdit,
+    CmdRoomLink,
+    CmdRoomDelete,
+    CmdBuyRoom,
+    CmdMyRooms,
+    CmdRoomPurpose,
+    CmdSellRoom
+)
 
 
 class CharacterCmdSet(default_cmds.CharacterCmdSet):
@@ -146,6 +156,18 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdApproveRequest())
         self.add(CmdDenyRequest())
         self.add(CmdMyRequests())
+
+        # Add Witcher RPG building commands
+        # GM commands
+        self.add(CmdRoomCreate())
+        self.add(CmdRoomEdit())
+        self.add(CmdRoomLink())
+        self.add(CmdRoomDelete())
+        # Player commands
+        self.add(CmdBuyRoom())
+        self.add(CmdMyRooms())
+        self.add(CmdRoomPurpose())
+        self.add(CmdSellRoom())
 
 
 class AccountCmdSet(default_cmds.AccountCmdSet):
