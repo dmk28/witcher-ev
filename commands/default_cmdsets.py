@@ -15,6 +15,13 @@ own cmdsets by inheriting from them or directly from `evennia.CmdSet`.
 """
 
 from evennia import default_cmds
+from commands.combat_commands import (
+    CmdCombatStart,
+    CmdAttack,
+    CmdCast,
+    CmdStance,
+    CmdCombatStatus
+)
 
 
 class CharacterCmdSet(default_cmds.CharacterCmdSet):
@@ -34,6 +41,13 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         #
         # any commands you add below will overload the default ones.
         #
+
+        # Add Witcher RPG combat commands
+        self.add(CmdCombatStart())
+        self.add(CmdAttack())
+        self.add(CmdCast())
+        self.add(CmdStance())
+        self.add(CmdCombatStatus())
 
 
 class AccountCmdSet(default_cmds.AccountCmdSet):

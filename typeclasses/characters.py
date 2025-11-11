@@ -202,37 +202,50 @@ class WitcherCharacter(Character):
 
         # Basic info
         lines.append(f"|wVocation:|n {char.vocation}")
+        lines.append(f"|wRace:|n {char.get_race_display()}")
         if char.nation:
             lines.append(f"|wNation:|n {char.nation}")
+        if char.witcher_style != 'none':
+            lines.append(f"|wWitcher Style:|n {char.get_witcher_style_display()}")
         lines.append(f"|wExperience:|n {char.experience_points} XP")
+
+        # Show race/style bonuses
+        race_mods = char.get_race_modifiers()
+        if race_mods['magic_cr_modifier'] != 0 or race_mods['damage_taken_modifier'] != 1.0:
+            lines.append(f"|wRacial Traits:|n {race_mods['description']}")
+
+        if char.witcher_style != 'none' and char.vocation.name == 'witcher':
+            style_bonuses = char.get_witcher_style_bonuses()
+            if style_bonuses:
+                lines.append(f"|wStyle:|n {style_bonuses['description']}")
+
         lines.append("")
 
-        # Stats
-        lines.append("|y--- Stats (with Vocation bonuses) ---|n")
-        stats = char.get_all_effective_stats()
+        # Stats (including all bonuses: vocation + witcher style)
+        lines.append("|y--- Stats (with All Bonuses) ---|n")
 
         # Physical
         lines.append(
-            f"|gPhysical:|n STR: {stats['strength']:2d}  "
-            f"AGI: {stats['agility']:2d}  "
-            f"END: {stats['endurance']:2d}  "
-            f"REF: {stats['reflexes']:2d}"
+            f"|gPhysical:|n STR: {char.get_total_effective_stat('strength'):2d}  "
+            f"AGI: {char.get_total_effective_stat('agility'):2d}  "
+            f"END: {char.get_total_effective_stat('endurance'):2d}  "
+            f"REF: {char.get_total_effective_stat('reflexes'):2d}"
         )
 
         # Mental
         lines.append(
-            f"|gMental:|n   WIT: {stats['wit']:2d}  "
-            f"INT: {stats['intelligence']:2d}  "
-            f"WIL: {stats['willpower']:2d}  "
-            f"PER: {stats['perception']:2d}"
+            f"|gMental:|n   WIT: {char.get_total_effective_stat('wit'):2d}  "
+            f"INT: {char.get_total_effective_stat('intelligence'):2d}  "
+            f"WIL: {char.get_total_effective_stat('willpower'):2d}  "
+            f"PER: {char.get_total_effective_stat('perception'):2d}"
         )
 
         # Social
         lines.append(
-            f"|gSocial:|n   CHA: {stats['charm']:2d}  "
-            f"APP: {stats['appearance']:2d}  "
-            f"GRA: {stats['graces']:2d}  "
-            f"CUN: {stats['cunning']:2d}"
+            f"|gSocial:|n   CHA: {char.get_total_effective_stat('charm'):2d}  "
+            f"APP: {char.get_total_effective_stat('appearance'):2d}  "
+            f"GRA: {char.get_total_effective_stat('graces'):2d}  "
+            f"CUN: {char.get_total_effective_stat('cunning'):2d}"
         )
         lines.append("")
 
@@ -265,6 +278,30 @@ class WitcherCharacter(Character):
             lines.append(f"|gCrafting:|n {skills.get_crafting_type_display()}: {skills.crafting_skill}")
 
         lines.append(f"|gGeneral:|n Athletics: {skills.athletics}")
+        lines.append("")
+
+        # Combat Stats
+        lines.append("|y--- Combat Stats ---|n")
+
+        # Calculate combat-related values
+        max_hp = char.get_total_effective_stat('endurance') * 10
+        initiative_bonus = (
+            char.get_total_effective_stat('reflexes') +
+            char.get_total_effective_stat('perception')
+        )
+
+        lines.append(f"|gMax HP:|n {max_hp} (Endurance × 10)")
+        lines.append(f"|gInitiative Bonus:|n +{initiative_bonus} (Reflexes + Perception)")
+
+        # Show racial combat modifiers
+        if race_mods['damage_taken_modifier'] != 1.0:
+            damage_percent = int(race_mods['damage_taken_modifier'] * 100)
+            lines.append(f"|gDamage Taken:|n {damage_percent}% of normal")
+
+        if race_mods['magic_cr_modifier'] != 0:
+            modifier_str = f"{race_mods['magic_cr_modifier']:+d}"
+            lines.append(f"|gSpell CR Modifier:|n {modifier_str}")
+
         lines.append("")
 
         # Vocation Feats
