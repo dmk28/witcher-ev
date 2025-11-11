@@ -325,22 +325,55 @@ class ExtractionSystem:
 
 class CraftingSystem:
     """
-    Handles item crafting.
+    Handles item crafting with tier-based difficulties and material quality.
+
+    Crafting Difficulties by Tier:
+    - Tier I: 10-20 CR (basic items)
+    - Tier II: 30-50 CR (quality items)
+    - Tier III: 60-85 CR (exceptional items)
+    - Tier IV: 90-120 CR (relics/artifacts)
+
+    Material Quality Reduction:
+    - Tier I materials: 0-2 CR per unit
+    - Tier II materials: 3-7 CR per unit
+    - Tier III materials: 8-15 CR per unit
+    - Tier IV materials: 20-35 CR per unit
     """
 
+    TIER_DIFFICULTY_RANGES = {
+        'tier_1': (10, 20),
+        'tier_2': (30, 50),
+        'tier_3': (60, 85),
+        'tier_4': (90, 120),
+    }
+
     @staticmethod
-    def can_craft(character, item_template):
+    def get_tier_info(tier):
+        """Get difficulty range for a tier."""
+        return CraftingSystem.TIER_DIFFICULTY_RANGES.get(tier, (10, 20))
+
+    @staticmethod
+    def can_craft(character, item_template, witcher_room):
         """
         Check if character can craft an item.
 
         Args:
             character: ObjectDB character instance
             item_template: ItemTemplate to craft
+            witcher_room: WitcherRoom instance (workshop)
 
         Returns:
-            dict: Result with can_craft bool and reasons
+            dict: Result with can_craft bool, reasons, and details
         """
         reasons = []
+
+        # Check workshop
+        is_valid, workshop_reason = witcher_room.is_valid_workshop(character)
+        if not is_valid:
+            return {
+                'can_craft': False,
+                'reasons': [workshop_reason]
+            }
 
         # Check skill access
         if item_template.crafting_skill_required:
@@ -380,21 +413,64 @@ class CraftingSystem:
         return {'can_craft': True, 'reasons': []}
 
     @staticmethod
-    def attempt_craft(character, item_template):
+    def calculate_material_quality_reduction(character, item_template):
         """
-        Attempt to craft an item.
+        Calculate difficulty reduction based on material quality.
+
+        Args:
+            character: ObjectDB character instance
+            item_template: ItemTemplate being crafted
+
+        Returns:
+            tuple: (total_reduction, material_details)
+        """
+        if not item_template.required_materials:
+            return (0, [])
+
+        total_reduction = 0
+        material_details = []
+
+        for material_name, needed_qty in item_template.required_materials.items():
+            material_template = ItemTemplate.objects.filter(
+                name=material_name
+            ).first()
+
+            if not material_template:
+                continue
+
+            # Get material quality bonus
+            quality_bonus = material_template.material_quality_bonus
+            reduction = quality_bonus * needed_qty
+
+            total_reduction += reduction
+
+            material_details.append({
+                'name': material_name,
+                'quantity': needed_qty,
+                'tier': material_template.get_tier_display(),
+                'quality_bonus': quality_bonus,
+                'total_reduction': reduction
+            })
+
+        return (total_reduction, material_details)
+
+    @staticmethod
+    def attempt_craft(character, item_template, witcher_room):
+        """
+        Attempt to craft an item with material quality calculations.
 
         Args:
             character: ObjectDB character instance
             item_template: ItemTemplate to craft
+            witcher_room: WitcherRoom instance (workshop)
 
         Returns:
-            dict: Craft result
+            dict: Craft result with details
         """
         from world.witcher_rpg.dice import ChallengeResolver
 
         # Check if can craft
-        can_craft_check = CraftingSystem.can_craft(character, item_template)
+        can_craft_check = CraftingSystem.can_craft(character, item_template, witcher_room)
         if not can_craft_check['can_craft']:
             return {
                 'success': False,
@@ -402,16 +478,32 @@ class CraftingSystem:
                 'reasons': can_craft_check['reasons']
             }
 
+        # Calculate material quality reduction
+        material_reduction, material_details = CraftingSystem.calculate_material_quality_reduction(
+            character, item_template
+        )
+
+        # Get base difficulty
+        base_difficulty = item_template.crafting_difficulty
+
+        # Apply material quality reduction
+        final_difficulty = max(5, base_difficulty - material_reduction)  # Minimum 5 CR
+
         # Get crafting skill
         crafting_skill = character.get_skill('crafting_skill')
         intelligence = character.get_stat('intelligence')
         dice_pool = intelligence + crafting_skill
 
-        # Roll vs crafting difficulty
+        # Roll vs modified difficulty
         result = ChallengeResolver.fixed_difficulty_check(
             dice_pool,
-            item_template.crafting_difficulty
+            final_difficulty
         )
+
+        # Build detailed message
+        difficulty_info = f"Base: {base_difficulty} CR"
+        if material_reduction > 0:
+            difficulty_info += f" - {material_reduction} (materials) = {final_difficulty} CR"
 
         if not result['success']:
             # Failed craft - materials lost
@@ -420,7 +512,12 @@ class CraftingSystem:
             return {
                 'success': False,
                 'message': f"Failed to craft {item_template.name}. Materials lost.",
-                'roll_result': result
+                'roll_result': result,
+                'base_difficulty': base_difficulty,
+                'material_reduction': material_reduction,
+                'final_difficulty': final_difficulty,
+                'material_details': material_details,
+                'difficulty_info': difficulty_info
             }
 
         # Success! Consume materials and create item
@@ -436,7 +533,12 @@ class CraftingSystem:
             'success': True,
             'message': f"Successfully crafted {item_template.name}!",
             'item': crafted_item,
-            'roll_result': result
+            'roll_result': result,
+            'base_difficulty': base_difficulty,
+            'material_reduction': material_reduction,
+            'final_difficulty': final_difficulty,
+            'material_details': material_details,
+            'difficulty_info': difficulty_info
         }
 
     @staticmethod

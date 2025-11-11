@@ -97,7 +97,13 @@ class ItemTemplate(models.Model):
     )
     crafting_difficulty = models.IntegerField(
         default=10,
-        help_text="CR to craft this item"
+        help_text="Base CR to craft this item (affected by material quality)"
+    )
+
+    # Material quality (when used as crafting material)
+    material_quality_bonus = models.IntegerField(
+        default=0,
+        help_text="CR reduction per unit when used as crafting material. Tier I: 0-2, Tier II: 3-7, Tier III: 8-15, Tier IV: 20-35"
     )
 
     created_date = models.DateTimeField(auto_now_add=True)

@@ -35,6 +35,9 @@ from commands.mission_commands import (
     CmdExtract,
     CmdMission
 )
+from commands.room_commands import (
+    CmdRoom
+)
 
 
 class CharacterCmdSet(default_cmds.CharacterCmdSet):
@@ -74,6 +77,9 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         # Add Witcher RPG mission commands
         self.add(CmdExtract())
         self.add(CmdMission())
+
+        # Add Witcher RPG room commands
+        self.add(CmdRoom())
 
 
 class AccountCmdSet(default_cmds.AccountCmdSet):

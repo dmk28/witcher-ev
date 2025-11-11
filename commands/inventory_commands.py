@@ -612,12 +612,35 @@ class CmdCraft(Command):
             caller.msg(f"No craftable item named '{item_name}' found. Use 'craft/list' to see available items.")
             return
 
+        # Check if in a workshop
+        from world.witcher_rpg.room_models import WitcherRoom
+
+        if not caller.location:
+            caller.msg("|rYou must be in a location to craft.|n")
+            return
+
+        try:
+            witcher_room = WitcherRoom.objects.get(room_object=caller.location)
+        except WitcherRoom.DoesNotExist:
+            caller.msg("|rThis location does not support crafting. You need a workshop in an urban area.|n")
+            return
+
         # Attempt to craft
-        result = CraftingSystem.attempt_craft(caller, template)
+        result = CraftingSystem.attempt_craft(caller, template, witcher_room)
 
         if result['success']:
             caller.msg(f"|g{result['message']}|n")
             caller.msg(f"Roll result: {result['roll_result']['message']}")
+            caller.msg(f"Difficulty: {result['difficulty_info']}")
+
+            # Show material quality breakdown
+            if result['material_details']:
+                caller.msg("\n|yMaterial Quality Bonuses:|n")
+                for mat in result['material_details']:
+                    caller.msg(
+                        f"  {mat['quantity']}x {mat['name']} ({mat['tier']}): "
+                        f"-{mat['total_reduction']} CR"
+                    )
         else:
             caller.msg(f"|r{result['message']}|n")
             if 'reasons' in result:
@@ -625,9 +648,20 @@ class CmdCraft(Command):
                     caller.msg(f"  - {reason}")
             if 'roll_result' in result:
                 caller.msg(f"Roll result: {result['roll_result']['message']}")
+                if 'difficulty_info' in result:
+                    caller.msg(f"Difficulty: {result['difficulty_info']}")
+
+                # Show material quality breakdown even on failure
+                if result.get('material_details'):
+                    caller.msg("\n|yMaterial Quality Bonuses (attempted):|n")
+                    for mat in result['material_details']:
+                        caller.msg(
+                            f"  {mat['quantity']}x {mat['name']} ({mat['tier']}): "
+                            f"-{mat['total_reduction']} CR"
+                        )
 
     def _list_craftable(self):
-        """List all craftable items."""
+        """List all craftable items with material quality information."""
         templates = ItemTemplate.objects.filter(
             required_materials__isnull=False
         ).exclude(required_materials={}).order_by('tier', 'name')
@@ -640,15 +674,28 @@ class CmdCraft(Command):
         output.append("|w" + "=" * 70 + "|n")
         output.append("|w" + f"{'Craftable Items':^70}" + "|n")
         output.append("|w" + "=" * 70 + "|n")
+        output.append("\n|cNote: Use high-quality materials to reduce crafting difficulty!|n")
+        output.append("|cTier I: 0-2 CR/unit, Tier II: 3-7 CR/unit, Tier III: 8-15 CR/unit, Tier IV: 20-35 CR/unit|n")
 
         for template in templates:
             output.append(f"\n|y{template.name}|n ({template.get_tier_display()})")
-            output.append(f"  Difficulty: CR {template.crafting_difficulty}")
+            output.append(f"  Base Difficulty: CR {template.crafting_difficulty}")
 
             if template.required_materials:
                 output.append("  Materials:")
                 for mat_name, qty in template.required_materials.items():
-                    output.append(f"    - {qty}x {mat_name}")
+                    # Get material template to show tier
+                    mat_template = ItemTemplate.objects.filter(name=mat_name).first()
+                    if mat_template:
+                        tier_display = mat_template.get_tier_display()
+                        quality_bonus = mat_template.material_quality_bonus
+                        total_reduction = quality_bonus * qty
+                        output.append(
+                            f"    - {qty}x {mat_name} ({tier_display}, "
+                            f"-{total_reduction} CR)"
+                        )
+                    else:
+                        output.append(f"    - {qty}x {mat_name}")
 
             if template.crafting_skill_required:
                 output.append(f"  Skill Required: {template.crafting_skill_required}")

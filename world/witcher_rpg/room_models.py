@@ -90,11 +90,36 @@ class WitcherRoom(models.Model):
         help_text="Is there an active mission in this room?"
     )
 
+    # Ownership (for private rooms like workshops)
+    owner = models.ForeignKey(
+        ObjectDB,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='owned_rooms',
+        help_text="Character who owns this room"
+    )
+
     # Organization ownership (for bank/storage rooms)
     organization = models.CharField(
         max_length=100,
         blank=True,
         help_text="Organization that owns this room (for bank/storage)"
+    )
+
+    # Room purpose (for urban rooms)
+    room_purpose = models.CharField(
+        max_length=50,
+        blank=True,
+        choices=[
+            ('', 'None'),
+            ('crafting', 'Crafting Workshop'),
+            ('storage', 'Storage/Warehouse'),
+            ('residence', 'Residence'),
+            ('shop', 'Shop/Merchant'),
+            ('tavern', 'Tavern/Inn'),
+        ],
+        help_text="Purpose of this room (especially for urban areas)"
     )
 
     created_date = models.DateTimeField(auto_now_add=True)
@@ -125,6 +150,33 @@ class WitcherRoom(models.Model):
         if not self.available_resources:
             return []
         return [(name, amount) for name, amount in self.available_resources.items()]
+
+    def is_valid_workshop(self, character):
+        """
+        Check if this room is a valid crafting workshop for a character.
+
+        Args:
+            character: ObjectDB character instance
+
+        Returns:
+            tuple: (is_valid, reason)
+        """
+        # Must be urban biome
+        if self.biome != 'urban':
+            return (False, "Workshops must be in urban areas.")
+
+        # Must have crafting purpose
+        if self.room_purpose != 'crafting':
+            return (False, "This room is not set up as a crafting workshop.")
+
+        # Must be owned by the character
+        if self.owner != character:
+            if self.owner:
+                return (False, f"This workshop is owned by {self.owner.db_key}.")
+            else:
+                return (False, "This workshop has no owner. You cannot use it.")
+
+        return (True, "")
 
 
 class Mission(models.Model):
