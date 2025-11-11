@@ -12,6 +12,7 @@ from world.witcher_rpg.organization_models import (
     IncomeLog
 )
 from world.witcher_rpg.models import WitcherCharacter
+from world.witcher_rpg.mush_utils import convert_mush_tokens
 from django.utils import timezone
 
 
@@ -54,11 +55,11 @@ class CmdIncome(Command):
 
         # Try to collect from each membership
         lines = []
-        lines.append("")
+        lines.append("%r")
         lines.append("=" * 70)
         lines.append("Monthly Income Collection")
         lines.append("=" * 70)
-        lines.append("")
+        lines.append("%r")
 
         total_collected = 0
         collected_count = 0
@@ -83,15 +84,15 @@ class CmdIncome(Command):
                 collected_count += 1
 
                 lines.append(f"|g✓|n {membership.organization.name}")
-                lines.append(f"  Rank: {membership.organization_rank}")
+                lines.append(f"%t%tRank: {membership.organization_rank}")
                 if membership.role:
-                    lines.append(f"  Role: {membership.role}")
-                lines.append(f"  Income: |y{amount:,} crowns|n")
+                    lines.append(f"%t%tRole: {membership.role}")
+                lines.append(f"%t%tIncome: |y{amount:,} crowns|n")
             else:
                 lines.append(f"|r✗|n {membership.organization.name}")
-                lines.append(f"  {message}")
+                lines.append(f"%t%t{message}")
 
-            lines.append("")
+            lines.append("%r")
 
         lines.append("-" * 70)
         if collected_count > 0:
@@ -100,9 +101,9 @@ class CmdIncome(Command):
         else:
             lines.append("|yNo income collected this time.|n")
         lines.append("=" * 70)
-        lines.append("")
+        lines.append("%r")
 
-        caller.msg("\n".join(lines))
+        caller.msg(convert_mush_tokens("%r".join(lines)))
 
 
 class CmdOrganizations(Command):
@@ -161,11 +162,11 @@ class CmdOrganizations(Command):
 
         # List organizations
         lines = []
-        lines.append("")
+        lines.append("%r")
         lines.append("=" * 80)
         lines.append("Available Organizations")
         lines.append("=" * 80)
-        lines.append("")
+        lines.append("%r")
         lines.append(f"{'Name':<30} {'Type':<25} {'Members':<10} {'Leader':<15}")
         lines.append("-" * 80)
 
@@ -181,46 +182,46 @@ class CmdOrganizations(Command):
             )
 
         lines.append("=" * 80)
-        lines.append("")
+        lines.append("%r")
         lines.append("Use |w+organizations <name>|n to view details about an organization.")
         lines.append("Use |w+orgjoin <name>|n to request membership.")
-        lines.append("")
+        lines.append("%r")
 
-        caller.msg("\n".join(lines))
+        caller.msg(convert_mush_tokens("%r".join(lines)))
 
     def _view_organization(self, org):
         """Display detailed information about an organization."""
         caller = self.caller
 
         lines = []
-        lines.append("")
+        lines.append("%r")
         lines.append("=" * 70)
         lines.append(f"{org.name}")
         lines.append("=" * 70)
-        lines.append("")
+        lines.append("%r")
 
         # Basic info
         lines.append(f"|wType:|n {org.get_organization_type_display()}")
         lines.append(f"|wLeader:|n {org.leader.db_key if org.leader else 'None'}")
         lines.append(f"|wActive:|n {'Yes' if org.is_active else '|rNo|n'}")
         lines.append(f"|wRequires Approval:|n {'Yes' if org.requires_approval else 'No'}")
-        lines.append("")
+        lines.append("%r")
 
         # Description
         lines.append("|wDescription:|n")
         lines.append(org.description)
-        lines.append("")
+        lines.append("%r")
 
         # Income information
         lines.append("|wIncome Information:|n")
-        lines.append(f"  Base Income Multiplier: {org.base_income_multiplier}x")
+        lines.append(f"%t%tBase Income Multiplier: {org.base_income_multiplier}x")
         if org.member_tithe_percentage > 0:
-            lines.append(f"  Member Tithing: {org.member_tithe_percentage}%")
-            lines.append(f"  Leader Share: {org.leader_share_percentage}%")
+            lines.append(f"%t%tMember Tithing: {org.member_tithe_percentage}%")
+            lines.append(f"%t%tLeader Share: {org.leader_share_percentage}%")
         if org.organization_type == OrganizationType.TRADING_COMPANY:
-            lines.append(f"  Investment Level: {org.investment_level}")
-            lines.append(f"  Investment Return: 5% monthly")
-        lines.append("")
+            lines.append(f"%t%tInvestment Level: {org.investment_level}")
+            lines.append(f"%t%tInvestment Return: 5% monthly")
+        lines.append("%r")
 
         # Rank income table
         lines.append("|wMonthly Income by Rank:|n")
@@ -229,8 +230,8 @@ class CmdOrganizations(Command):
         }
         for rank, base in rank_income.items():
             modified = int(base * org.base_income_multiplier)
-            lines.append(f"  Rank {rank}: {modified:,} crowns/month")
-        lines.append("")
+            lines.append(f"%t%tRank {rank}: {modified:,} crowns/month")
+        lines.append("%r")
 
         # Members
         memberships = OrganizationMembership.objects.filter(
@@ -240,21 +241,21 @@ class CmdOrganizations(Command):
 
         lines.append(f"|wMembers:|n ({memberships.count()})")
         if memberships.exists():
-            lines.append(f"  {'Name':<20} {'Rank':<8} {'Role':<20}")
-            lines.append("  " + "-" * 48)
+            lines.append(f"%t%t{'Name':<20} {'Rank':<8} {'Role':<20}")
+            lines.append("%t%t" + "-" * 48)
             for membership in memberships[:10]:  # Show first 10
                 member_name = membership.member.db_key
                 rank = f"Rank {membership.organization_rank}"
                 role = membership.role or "-"
-                lines.append(f"  {member_name:<20} {rank:<8} {role:<20}")
+                lines.append(f"%t%t{member_name:<20} {rank:<8} {role:<20}")
             if memberships.count() > 10:
-                lines.append(f"  ... and {memberships.count() - 10} more")
+                lines.append(f"%t%t... and {memberships.count() - 10} more")
         else:
-            lines.append("  None")
+            lines.append("%t%tNone")
 
-        lines.append("")
+        lines.append("%r")
         lines.append("=" * 70)
-        lines.append("")
+        lines.append("%r")
 
         # Check if caller is a member
         try:
@@ -268,8 +269,8 @@ class CmdOrganizations(Command):
             if org.is_active:
                 lines.append("Use |w+orgjoin " + org.name + "|n to request membership.")
 
-        lines.append("")
-        caller.msg("\n".join(lines))
+        lines.append("%r")
+        caller.msg(convert_mush_tokens("%r".join(lines)))
 
 
 class CmdOrgJoin(Command):
@@ -552,18 +553,18 @@ class CmdOrgManage(Command):
     def _view_management(self, org, caller):
         """View organization management panel."""
         lines = []
-        lines.append("")
+        lines.append("%r")
         lines.append("=" * 70)
         lines.append(f"Managing: {org.name}")
         lines.append("=" * 70)
-        lines.append("")
+        lines.append("%r")
 
         # Organization stats
         lines.append(f"|wTreasury:|n {org.treasury:,} crowns")
         lines.append(f"|wMembers:|n {org.get_member_count()}")
         if org.organization_type == OrganizationType.TRADING_COMPANY:
             lines.append(f"|wInvestment Level:|n {org.investment_level}")
-        lines.append("")
+        lines.append("%r")
 
         # Pending approvals
         pending = OrganizationMembership.objects.filter(
@@ -574,22 +575,22 @@ class CmdOrgManage(Command):
         if pending.exists():
             lines.append("|yPending Approvals:|n")
             for membership in pending:
-                lines.append(f"  - {membership.member.db_key}")
-            lines.append("")
+                lines.append(f"%t%t- {membership.member.db_key}")
+            lines.append("%r")
 
         # Management commands
         lines.append("|wManagement Commands:|n")
-        lines.append(f"  +orgmanage {org.name}/promote <member> = <rank>")
-        lines.append(f"  +orgmanage {org.name}/demote <member> = <rank>")
-        lines.append(f"  +orgmanage {org.name}/setrole <member> = <role>")
-        lines.append(f"  +orgmanage {org.name}/approve <member>")
-        lines.append(f"  +orgmanage {org.name}/kick <member>")
-        lines.append(f"  +orgmanage {org.name}/transfer <member>")
+        lines.append(f"%t%t+orgmanage {org.name}/promote <member> = <rank>")
+        lines.append(f"%t%t+orgmanage {org.name}/demote <member> = <rank>")
+        lines.append(f"%t%t+orgmanage {org.name}/setrole <member> = <role>")
+        lines.append(f"%t%t+orgmanage {org.name}/approve <member>")
+        lines.append(f"%t%t+orgmanage {org.name}/kick <member>")
+        lines.append(f"%t%t+orgmanage {org.name}/transfer <member>")
 
-        lines.append("")
+        lines.append("%r")
         lines.append("=" * 70)
-        lines.append("")
-        caller.msg("\n".join(lines))
+        lines.append("%r")
+        caller.msg(convert_mush_tokens("%r".join(lines)))
 
     def _change_rank(self, org, caller):
         """Promote or demote a member."""
