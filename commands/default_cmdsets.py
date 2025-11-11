@@ -57,6 +57,21 @@ from commands.advancement_commands import (
     CmdApprove,
     CmdAdvancementHistory
 )
+from commands.crafting_commands import (
+    CmdRecipes,
+    CmdCraft as CmdCraftRecipe,
+    CmdLearnRecipe,
+    CmdSetBonus,
+    CmdCraftingHistory
+)
+from commands.request_commands import (
+    CmdRequestChar,
+    CmdGMRequests,
+    CmdApproveRequest,
+    CmdDenyRequest,
+    CmdViewRequest,
+    CmdMyRequests
+)
 
 
 class CharacterCmdSet(default_cmds.CharacterCmdSet):
@@ -118,6 +133,21 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdRequest())
         self.add(CmdApprove())
         self.add(CmdAdvancementHistory())
+
+        # Add Witcher RPG crafting commands
+        self.add(CmdRecipes())
+        self.add(CmdCraftRecipe())
+        self.add(CmdLearnRecipe())
+        self.add(CmdSetBonus())
+        self.add(CmdCraftingHistory())
+
+        # Add Witcher RPG request commands
+        self.add(CmdRequestChar())
+        self.add(CmdGMRequests())
+        self.add(CmdApproveRequest())
+        self.add(CmdDenyRequest())
+        self.add(CmdViewRequest())
+        self.add(CmdMyRequests())
 
 
 class AccountCmdSet(default_cmds.AccountCmdSet):
