@@ -203,8 +203,8 @@ class WitcherCharacter(Character):
         # Basic info
         lines.append(f"|wVocation:|n {char.vocation}")
         lines.append(f"|wRace:|n {char.get_race_display()}")
-        if char.nation:
-            lines.append(f"|wNation:|n {char.nation}")
+        if char.country:
+            lines.append(f"|wCountry:|n {char.country.get_name_display()} (+1 {char.country.bonus_stat.title()})")
         if char.witcher_style != 'none':
             lines.append(f"|wWitcher Style:|n {char.get_witcher_style_display()}")
         lines.append(f"|wExperience:|n {char.experience_points} XP")

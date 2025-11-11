@@ -7,6 +7,61 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from evennia.objects.models import ObjectDB
 
 
+class Country(models.Model):
+    """
+    Represents a country/nation in the Witcher universe.
+    Each country provides a bonus to one non-physical stat.
+    """
+
+    COUNTRY_CHOICES = [
+        ('nilfgaard', 'Nilfgaardian Empire'),
+        ('temeria', 'Temeria'),
+        ('redania', 'Redania'),
+        ('skellige', 'Skellige'),
+        ('kovir', 'Kovir and Poviss'),
+        ('cintra', 'Cintra'),
+        ('aedirn', 'Aedirn'),
+        ('kaedwen', 'Kaedwen'),
+        ('lyria', 'Lyria and Rivia'),
+        ('cidaris', 'Cidaris'),
+    ]
+
+    name = models.CharField(
+        max_length=50,
+        choices=COUNTRY_CHOICES,
+        unique=True,
+        help_text="Country name"
+    )
+    description = models.TextField(
+        blank=True,
+        help_text="Description of the country and its culture"
+    )
+
+    # Stat bonus (non-physical only: Mental or Social)
+    bonus_stat = models.CharField(
+        max_length=20,
+        choices=[
+            ('wit', 'Wit'),
+            ('intelligence', 'Intelligence'),
+            ('willpower', 'Willpower'),
+            ('perception', 'Perception'),
+            ('charm', 'Charm'),
+            ('appearance', 'Appearance'),
+            ('graces', 'Graces'),
+            ('cunning', 'Cunning'),
+        ],
+        help_text="Non-physical stat that receives +1 bonus"
+    )
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = "Country"
+        verbose_name_plural = "Countries"
+
+    def __str__(self):
+        return f"{self.get_name_display()} (+1 {self.bonus_stat.title()})"
+
+
 class Vocation(models.Model):
     """
     Represents a character vocation/class in the Witcher universe.
@@ -349,10 +404,13 @@ class WitcherCharacter(models.Model):
     )
 
     # Additional character info
-    nation = models.CharField(
-        max_length=100,
+    country = models.ForeignKey(
+        Country,
+        on_delete=models.SET_NULL,
+        null=True,
         blank=True,
-        help_text="Nation or origin"
+        related_name='characters',
+        help_text="Country of origin (provides +1 to a non-physical stat)"
     )
     background = models.TextField(
         blank=True,
@@ -401,7 +459,7 @@ class WitcherCharacter(models.Model):
 
     def get_effective_stat(self, stat_name):
         """
-        Get the effective value of a stat including vocation modifiers.
+        Get the effective value of a stat including vocation and country modifiers.
 
         Args:
             stat_name (str): Name of the stat (e.g., 'strength', 'agility')
@@ -411,7 +469,13 @@ class WitcherCharacter(models.Model):
         """
         base_value = getattr(self.stats, stat_name, 0)
         vocation_mod = getattr(self.vocation, f"{stat_name}_mod", 0)
-        return base_value + vocation_mod
+
+        # Add country bonus if applicable
+        country_mod = 0
+        if self.country and self.country.bonus_stat == stat_name:
+            country_mod = 1
+
+        return base_value + vocation_mod + country_mod
 
     def get_all_effective_stats(self):
         """
@@ -598,3 +662,92 @@ class WitcherCharacter(models.Model):
         self.skills.save()
 
         return applied_skills
+
+    # Character Creation Constants
+    STAT_POINTS = 24  # Points to distribute beyond base 1 in each stat
+    SKILL_POINTS = 25  # Points for skills
+
+    @staticmethod
+    def calculate_skill_cost(skill_level):
+        """
+        Calculate the cost for a given skill level.
+        Skills 0-4 cost 1 point per level.
+        Skills 5+ cost 2 points per level above 4.
+
+        Args:
+            skill_level (int): Desired skill level
+
+        Returns:
+            int: Total cost in points
+        """
+        if skill_level <= 4:
+            return skill_level
+        else:
+            # 4 points to get to 4, then 2 points per level above 4
+            return 4 + ((skill_level - 4) * 2)
+
+    @staticmethod
+    def validate_skill_allocation(skills_dict):
+        """
+        Validate skill point allocation.
+
+        Args:
+            skills_dict (dict): Dictionary of skill_name: skill_level
+
+        Returns:
+            tuple: (is_valid, error_message)
+        """
+        total_cost = 0
+        skills_at_five_or_above = 0
+
+        for skill_name, skill_level in skills_dict.items():
+            if skill_level < 0:
+                return (False, f"Skill '{skill_name}' cannot be negative.")
+
+            if skill_level > 10:
+                return (False, f"Skill '{skill_name}' cannot exceed 10.")
+
+            # Count skills at 5 or above
+            if skill_level >= 5:
+                skills_at_five_or_above += 1
+
+            # Calculate cost
+            total_cost += WitcherCharacter.calculate_skill_cost(skill_level)
+
+        # Check restrictions
+        if skills_at_five_or_above > 1:
+            return (False, "You can only have ONE skill starting at 5 or higher.")
+
+        if total_cost > WitcherCharacter.SKILL_POINTS:
+            return (False, f"Total skill cost ({total_cost}) exceeds available points ({WitcherCharacter.SKILL_POINTS}).")
+
+        return (True, "")
+
+    @staticmethod
+    def validate_stat_allocation(stats_dict):
+        """
+        Validate stat point allocation.
+        Each stat starts at 1, player gets STAT_POINTS to distribute.
+
+        Args:
+            stats_dict (dict): Dictionary of stat_name: stat_value (includes the base 1)
+
+        Returns:
+            tuple: (is_valid, error_message, points_spent)
+        """
+        total_points_spent = 0
+
+        for stat_name, stat_value in stats_dict.items():
+            if stat_value < 1:
+                return (False, f"Stat '{stat_name}' cannot be below 1.", 0)
+
+            if stat_value > 10:
+                return (False, f"Stat '{stat_name}' cannot exceed 10.", 0)
+
+            # Points spent = value - 1 (since base is 1)
+            total_points_spent += (stat_value - 1)
+
+        if total_points_spent > WitcherCharacter.STAT_POINTS:
+            return (False, f"Total stat points ({total_points_spent}) exceeds available points ({WitcherCharacter.STAT_POINTS}).", total_points_spent)
+
+        return (True, "", total_points_spent)
