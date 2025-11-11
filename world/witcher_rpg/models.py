@@ -440,6 +440,21 @@ class WitcherCharacter(models.Model):
         help_text="Witcher school style (only for Witcher vocation)"
     )
 
+    # Social rank and standing
+    SOCIAL_RANK_CHOICES = [
+        (1, 'Rank 1 - Outcast (+5 CR: tests harder)'),
+        (2, 'Rank 2 - Commoner (+0 CR: normal)'),
+        (3, 'Rank 3 - Knight/Small Gentry (-5 CR: tests easier)'),
+        (4, 'Rank 4 - Landed Gentry (-10 CR: tests easier)'),
+        (5, 'Rank 5 - Royalty (-20 CR: tests much easier)'),
+    ]
+    social_rank = models.IntegerField(
+        choices=SOCIAL_RANK_CHOICES,
+        default=2,
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        help_text="Social standing (affects CR for most rolls). Witchers: 1-2, Sorcerers: 3-4, Others: 1-5"
+    )
+
     # Experience and progression
     experience_points = models.IntegerField(
         default=0,
@@ -751,3 +766,70 @@ class WitcherCharacter(models.Model):
             return (False, f"Total stat points ({total_points_spent}) exceeds available points ({WitcherCharacter.STAT_POINTS}).", total_points_spent)
 
         return (True, "", total_points_spent)
+
+    def get_social_rank_cr_modifier(self):
+        """
+        Get CR modifier based on social rank.
+        Lower rank = increase CR (outcasts face more challenges)
+        Higher rank = reduce CR (privilege makes life easier)
+
+        Returns:
+            int: CR modifier applied to difficulty (positive = harder, negative = easier)
+        """
+        rank_modifiers = {
+            1: 5,   # Outcast: +5 CR (tests are harder - discrimination, prejudice)
+            2: 0,   # Commoner: No modifier
+            3: -5,  # Knight/Small Gentry: -5 CR (tests are easier)
+            4: -10, # Landed Gentry: -10 CR (tests are easier)
+            5: -20, # Royalty: -20 CR (tests are much easier - privilege)
+        }
+        return rank_modifiers.get(self.social_rank, 0)
+
+    def get_social_rank_display_full(self):
+        """Get full display of social rank with CR modifier."""
+        rank_names = {
+            1: 'Outcast',
+            2: 'Commoner',
+            3: 'Knight/Small Gentry',
+            4: 'Landed Gentry',
+            5: 'Royalty',
+        }
+        modifier = self.get_social_rank_cr_modifier()
+        modifier_str = f"{modifier:+d}" if modifier != 0 else "+0"
+        return f"Rank {self.social_rank} - {rank_names.get(self.social_rank, 'Unknown')} ({modifier_str} CR)"
+
+    @staticmethod
+    def get_max_rank_for_vocation(vocation_name):
+        """
+        Get maximum allowed social rank for a vocation.
+
+        Args:
+            vocation_name (str): Name of the vocation
+
+        Returns:
+            int: Maximum allowed rank (1-5)
+        """
+        rank_limits = {
+            'witcher': 2,      # Witchers: outcasts, max rank 2 (commoner)
+            'sorcerer': 4,     # Sorcerers: max rank 4 (landed gentry)
+            # All others can go to rank 5
+        }
+        return rank_limits.get(vocation_name, 5)
+
+    def validate_social_rank(self):
+        """
+        Validate that social rank is within vocation limits.
+
+        Returns:
+            tuple: (is_valid, error_message)
+        """
+        max_rank = WitcherCharacter.get_max_rank_for_vocation(self.vocation.name)
+
+        if self.social_rank > max_rank:
+            return (False, f"{self.vocation.get_name_display()} can only have rank {max_rank} or lower.")
+
+        # Witchers should really be rank 1 unless they're leaders
+        if self.vocation.name == 'witcher' and self.social_rank > 1:
+            return (True, f"Warning: Most Witchers are Rank 1 (Outcast). Rank 2 is for leaders like Vesemir.")
+
+        return (True, "")

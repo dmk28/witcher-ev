@@ -139,7 +139,7 @@ class WitcherCharacter(Character):
         return max(dice_pool, 1)  # Minimum 1 die
 
     def roll_check(self, stat_name, skill_name=None, difficulty=None,
-                   bonus_dice=0, show_to_room=False):
+                   bonus_dice=0, show_to_room=False, apply_social_rank=True):
         """
         Perform a dice roll check.
 
@@ -149,6 +149,7 @@ class WitcherCharacter(Character):
             difficulty (int, optional): Fixed difficulty, or None for simple roll
             bonus_dice (int): Bonus dice to add
             show_to_room (bool): Whether to show result to entire room
+            apply_social_rank (bool): Whether to apply social rank CR modifier
 
         Returns:
             dict: Roll result with success/failure information
@@ -158,9 +159,17 @@ class WitcherCharacter(Character):
         # Calculate dice pool
         dice_pool = self.calculate_dice_pool(stat_name, skill_name, bonus_dice)
 
+        # Apply social rank modifier to difficulty if applicable
+        adjusted_difficulty = difficulty
+        rank_modifier = 0
+        if difficulty is not None and apply_social_rank and self.db_character:
+            rank_modifier = self.db_character.get_social_rank_cr_modifier()
+            # Positive modifier increases difficulty, negative reduces it
+            adjusted_difficulty = max(1, difficulty + rank_modifier)
+
         # Perform the roll
-        if difficulty is not None:
-            result = ChallengeResolver.fixed_difficulty_check(dice_pool, difficulty)
+        if adjusted_difficulty is not None:
+            result = ChallengeResolver.fixed_difficulty_check(dice_pool, adjusted_difficulty)
             message = ChallengeResolver.format_challenge_result(result, 'fixed')
         else:
             result = DiceRoller.roll_multiple_d10(dice_pool)
@@ -171,6 +180,11 @@ class WitcherCharacter(Character):
         if skill_name:
             context_parts.append(skill_name.title())
         context = f"{' + '.join(context_parts)} ({dice_pool}d10)"
+
+        # Add rank modifier info if applied
+        if rank_modifier != 0 and difficulty is not None:
+            modifier_str = f"+{rank_modifier}" if rank_modifier > 0 else str(rank_modifier)
+            context += f" vs CR {difficulty} {modifier_str} = {adjusted_difficulty}"
 
         full_message = f"|c{self.name}|n rolls |w{context}|n:\n{message}"
 
@@ -205,6 +219,7 @@ class WitcherCharacter(Character):
         lines.append(f"|wRace:|n {char.get_race_display()}")
         if char.country:
             lines.append(f"|wCountry:|n {char.country.get_name_display()} (+1 {char.country.bonus_stat.title()})")
+        lines.append(f"|wSocial Rank:|n {char.get_social_rank_display_full()}")
         if char.witcher_style != 'none':
             lines.append(f"|wWitcher Style:|n {char.get_witcher_style_display()}")
         lines.append(f"|wExperience:|n {char.experience_points} XP")
