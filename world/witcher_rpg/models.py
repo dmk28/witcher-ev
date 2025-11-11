@@ -522,3 +522,29 @@ class WitcherCharacter(models.Model):
                 base += style_bonuses[stat_name]
 
         return base
+
+    def get_appearance_modifier(self, context='general', target_gender=None):
+        """
+        Get appearance modifier with special handling for Witchers.
+
+        Witchers have no general appearance penalty, but gain +3 to Appearance
+        for seduction rolls against females (lore-accurate to The Witcher series).
+
+        Args:
+            context (str): 'general', 'seduction', 'intimidation', etc.
+            target_gender (str): 'male', 'female', None
+
+        Returns:
+            int: Appearance modifier
+        """
+        # Base vocation modifier
+        base_mod = self.vocation.appearance_mod
+
+        # Special Witcher mechanic
+        if self.vocation.name == 'witcher':
+            if context == 'seduction' and target_gender == 'female':
+                return 3  # Lore-accurate: Witchers are attractive to women despite mutations
+            # No penalty for general appearance (mutations visible but not necessarily ugly)
+            return 0
+
+        return base_mod

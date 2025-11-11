@@ -315,6 +315,17 @@ class WitcherCharacter(Character):
                 if feat.trigger_condition:
                     feat_desc += f" |c[{feat.trigger_condition}]|n"
                 lines.append(feat_desc)
+
+        # Special Witcher appearance mechanic
+        if char.vocation.name == 'witcher':
+            if not feats:
+                lines.append("|y--- Vocation Feats ---|n")
+            lines.append(
+                "|gWitcher Mystique:|n +3 Appearance for seduction rolls vs females. "
+                "|c[Lore-accurate: mutations make Witchers strangely attractive]|n"
+            )
+
+        if feats or char.vocation.name == 'witcher':
             lines.append("")
 
         lines.append(f"|c{'=' * 70}|n")

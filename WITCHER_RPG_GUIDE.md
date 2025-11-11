@@ -64,10 +64,11 @@ This system follows Evennia best practices with a model → typeclass pattern:
 
 ### 6. **Witcher**
 - **Bonuses**: +1 Reflexes, +1 Agility, +1 Endurance
-- **Penalties**: -2 Graces, -1 Appearance
+- **Penalties**: -2 Graces
+- **Special**: +3 Appearance for seduction rolls vs females (lore-accurate)
 - **Feat**: Witcher Mutations (+1d to Reflexes)
 - **Access**: Alchemy, Sign Sorcery, Crafting
-- **Description**: Mutated monster hunters with supernatural abilities
+- **Description**: Mutated monster hunters with supernatural abilities. Despite visible mutations (cat eyes, pale skin), Witchers possess an inexplicable allure to women.
 
 ### 7. **Courtesan**
 - **Bonuses**: +2 Charm, +1 Appearance, +1 Cunning, +1 Graces

@@ -22,6 +22,19 @@ from commands.combat_commands import (
     CmdStance,
     CmdCombatStatus
 )
+from commands.inventory_commands import (
+    CmdInventory,
+    CmdEquip,
+    CmdUnequip,
+    CmdUse,
+    CmdGive,
+    CmdBank,
+    CmdCraft
+)
+from commands.mission_commands import (
+    CmdExtract,
+    CmdMission
+)
 
 
 class CharacterCmdSet(default_cmds.CharacterCmdSet):
@@ -48,6 +61,19 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdCast())
         self.add(CmdStance())
         self.add(CmdCombatStatus())
+
+        # Add Witcher RPG inventory commands
+        self.add(CmdInventory())
+        self.add(CmdEquip())
+        self.add(CmdUnequip())
+        self.add(CmdUse())
+        self.add(CmdGive())
+        self.add(CmdBank())
+        self.add(CmdCraft())
+
+        # Add Witcher RPG mission commands
+        self.add(CmdExtract())
+        self.add(CmdMission())
 
 
 class AccountCmdSet(default_cmds.AccountCmdSet):
