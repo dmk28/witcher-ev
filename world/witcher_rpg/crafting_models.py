@@ -28,7 +28,9 @@ class CraftingRecipe(models.Model):
         'ItemTemplate',
         on_delete=models.CASCADE,
         related_name='crafting_recipes',
-        help_text="Item produced by this recipe"
+        null=True,
+        blank=True,
+        help_text="Item produced by this recipe (optional until item is created)"
     )
 
     crafting_type = models.CharField(
