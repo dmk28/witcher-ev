@@ -58,6 +58,13 @@ class Vocation(models.Model):
     has_sign_sorcery = models.BooleanField(default=False, help_text="Access to Sign Sorcery")
     has_crafting = models.BooleanField(default=False, help_text="Access to Crafting skills")
 
+    # Starting skill package
+    default_skills = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Starting skill levels for this vocation: {'blades': 3, 'athletics': 2, ...}"
+    )
+
     class Meta:
         ordering = ['name']
         verbose_name = "Vocation"
@@ -273,6 +280,23 @@ class CharacterSkills(models.Model):
         default=0,
         validators=[MinValueValidator(0), MaxValueValidator(10)],
         help_text="Physical fitness, running, jumping, climbing"
+    )
+
+    # Support skills
+    resistance = models.IntegerField(
+        default=0,
+        validators=[MinValueValidator(0), MaxValueValidator(10)],
+        help_text="Physical resistance, damage reduction (used for soak)"
+    )
+    leadership = models.IntegerField(
+        default=0,
+        validators=[MinValueValidator(0), MaxValueValidator(10)],
+        help_text="Military leadership, commanding troops, inspiring allies"
+    )
+    tactics = models.IntegerField(
+        default=0,
+        validators=[MinValueValidator(0), MaxValueValidator(10)],
+        help_text="Tactical planning, battlefield strategy, military knowledge"
     )
 
     class Meta:
@@ -548,3 +572,29 @@ class WitcherCharacter(models.Model):
             return 0
 
         return base_mod
+
+    def apply_skill_package(self):
+        """
+        Apply the vocation's default skill package to this character's skills.
+        Should be called during character creation.
+
+        Returns:
+            dict: Skills that were applied
+        """
+        if not self.vocation.default_skills:
+            return {}
+
+        applied_skills = {}
+
+        for skill_name, skill_level in self.vocation.default_skills.items():
+            # Set the skill level
+            if hasattr(self.skills, skill_name):
+                setattr(self.skills, skill_name, skill_level)
+                applied_skills[skill_name] = skill_level
+            else:
+                print(f"Warning: Skill '{skill_name}' not found on CharacterSkills")
+
+        # Save the skills
+        self.skills.save()
+
+        return applied_skills

@@ -174,7 +174,7 @@ class CombatEngine:
     def calculate_soak(defender_participant, attack_cr):
         """
         Calculate damage soaked.
-        Soak: Endurance + Athletics + Armor vs CR of the attack
+        Soak: Endurance + Resistance + Armor vs CR of the attack
 
         Args:
             defender_participant: CombatParticipant instance
@@ -186,10 +186,10 @@ class CombatEngine:
         defender_char = defender_participant.character
 
         endurance = defender_char.get_stat('endurance')
-        athletics = defender_char.get_skill('athletics')
+        resistance = defender_char.get_skill('resistance')
         armor = defender_participant.armor_value
 
-        dice_pool = endurance + athletics + armor
+        dice_pool = endurance + resistance + armor
 
         # Roll vs attack CR
         result = ChallengeResolver.fixed_difficulty_check(

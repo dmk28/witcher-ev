@@ -479,7 +479,7 @@ stance <defensive|moderate|offensive>      - Change stance
 - **Initiative**: Reflexes + Perception + 1d10
 - **Attack Roll**: Agility + Weapon Skill (vs Reflexes + Weapon Skill)
 - **Damage**: Strength + Weapon Skill × attack modifier
-- **Soak**: Endurance + Athletics + Armor (vs attack CR)
+- **Soak**: Endurance + Resistance + Armor (vs attack CR)
 
 ### Important Numbers
 

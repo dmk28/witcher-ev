@@ -278,6 +278,19 @@ class WitcherCharacter(Character):
             lines.append(f"|gCrafting:|n {skills.get_crafting_type_display()}: {skills.crafting_skill}")
 
         lines.append(f"|gGeneral:|n Athletics: {skills.athletics}")
+
+        # Support skills (if any are non-zero)
+        support_skills = []
+        if skills.resistance > 0:
+            support_skills.append(f"Resistance: {skills.resistance}")
+        if skills.leadership > 0:
+            support_skills.append(f"Leadership: {skills.leadership}")
+        if skills.tactics > 0:
+            support_skills.append(f"Tactics: {skills.tactics}")
+
+        if support_skills:
+            lines.append("|gSupport:|n " + "  ".join(support_skills))
+
         lines.append("")
 
         # Combat Stats
