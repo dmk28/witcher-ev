@@ -19,10 +19,44 @@ class ItemCategory(models.TextChoices):
     """Categories of items."""
     WEAPON = 'weapon', 'Weapon'
     ARMOR = 'armor', 'Armor'
+    SHIELD = 'shield', 'Shield'
     CONSUMABLE = 'consumable', 'Consumable'
     MATERIAL = 'material', 'Crafting Material'
     QUEST = 'quest', 'Quest Item'
     MISC = 'misc', 'Miscellaneous'
+
+
+class WeaponType(models.TextChoices):
+    """Types of weapons linked to skills."""
+    BLADES = 'blades', 'Blades (Swords, Daggers)'
+    AXES = 'axes', 'Axes (Axes, Hatchets)'
+    MACES = 'maces', 'Maces (Maces, Hammers, Clubs)'
+    SPEARS = 'spears', 'Spears (Spears, Polearms, Halberds)'
+    CROSSBOWS = 'crossbows', 'Crossbows (Crossbows, Bows)'
+    BRAWLING = 'brawling', 'Brawling (Fists, Gauntlets)'
+
+
+class ArmorType(models.TextChoices):
+    """Types of armor."""
+    LIGHT = 'light', 'Light Armor (Leather, Cloth)'
+    MEDIUM = 'medium', 'Medium Armor (Studded, Chain)'
+    HEAVY = 'heavy', 'Heavy Armor (Plate, Full Plate)'
+
+
+class EquipmentSlot(models.TextChoices):
+    """Equipment slots for wearable items."""
+    WEAPON_MAIN = 'weapon_main', 'Main Hand Weapon'
+    WEAPON_OFF = 'weapon_off', 'Off-Hand Weapon'
+    SHIELD = 'shield', 'Shield'
+    HEAD = 'head', 'Head/Helmet'
+    CHEST = 'chest', 'Chest/Torso'
+    LEGS = 'legs', 'Legs/Greaves'
+    FEET = 'feet', 'Feet/Boots'
+    HANDS = 'hands', 'Hands/Gauntlets'
+    BACK = 'back', 'Back/Cloak'
+    NECK = 'neck', 'Neck/Amulet'
+    RING_1 = 'ring_1', 'Ring Slot 1'
+    RING_2 = 'ring_2', 'Ring Slot 2'
 
 
 class ItemTemplate(models.Model):
@@ -45,6 +79,31 @@ class ItemTemplate(models.Model):
         choices=ItemCategory.choices,
         default=ItemCategory.MISC,
         help_text="Item category"
+    )
+
+    # Weapon/Armor specific fields
+    weapon_type = models.CharField(
+        max_length=20,
+        choices=WeaponType.choices,
+        blank=True,
+        null=True,
+        help_text="Type of weapon (links to skill)"
+    )
+
+    armor_type = models.CharField(
+        max_length=20,
+        choices=ArmorType.choices,
+        blank=True,
+        null=True,
+        help_text="Type of armor (light/medium/heavy)"
+    )
+
+    equipment_slot = models.CharField(
+        max_length=20,
+        choices=EquipmentSlot.choices,
+        blank=True,
+        null=True,
+        help_text="Equipment slot this item occupies"
     )
 
     # Value
