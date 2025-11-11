@@ -18,6 +18,19 @@ from .combat_models import (
     CombatEncounter,
     CombatParticipant
 )
+from .item_models import (
+    ItemTemplate,
+    InventoryItem,
+    BankStorage,
+    Currency
+)
+from .room_models import (
+    WitcherRoom,
+    Mission,
+    MissionLog,
+    ExtractionResource,
+    BiomeMobTemplate
+)
 
 
 class VocationFeatInline(admin.TabularInline):
@@ -474,3 +487,7 @@ class CombatParticipantAdmin(admin.ModelAdmin):
             obj.max_hp
         )
     hp_display.short_description = 'HP'
+
+# Import additional admin classes
+from .admin_items_rooms import *
+
