@@ -8,13 +8,54 @@ Handles all types of GM approval requests:
 - Custom requests
 """
 
-from evennia import Command
+from evennia import Command, CmdSet
 from django.utils import timezone
 from world.witcher_rpg.request_models import (
     UnifiedRequest,
     CharacterGenerationRequest
 )
 from world.witcher_rpg.models import WitcherCharacter, Vocation, Country
+
+
+class ChargenInputCmdSet(CmdSet):
+    """
+    Temporary cmdset for handling character generation input.
+    This cmdset overrides normal command processing to capture all input.
+    """
+    key = "chargen_input"
+    priority = 101  # Higher priority to override default commands
+    mergetype = "Replace"  # Replace all other commands
+
+    def at_cmdset_creation(self):
+        """Add the input handler command."""
+        self.add(CmdChargenInput())
+
+
+class CmdChargenInput(Command):
+    """
+    Handle all input during character generation.
+    """
+    key = "__chargen_input__"
+    aliases = []
+    locks = "cmd:all()"
+    auto_help = False
+    arg_regex = r"^.*$"  # Match everything
+
+    def func(self):
+        """Process input based on current chargen step."""
+        caller = self.caller
+
+        if not hasattr(caller.ndb, 'chargen') or not caller.ndb.chargen:
+            # Chargen not active, remove cmdset
+            caller.cmdset.remove(ChargenInputCmdSet)
+            caller.msg("|yCharacter generation not active.|n")
+            return
+
+        # Get the callback function
+        callback = caller.ndb._chargen_callback
+        if callback:
+            # Call the callback with the raw input
+            callback(caller, self.raw_string.strip())
 
 
 class CmdRequestChar(Command):
@@ -47,10 +88,13 @@ class CmdRequestChar(Command):
         caller = self.caller
 
         # Check if already has a character
-        if WitcherCharacter.objects.filter(character=caller).exists():
-            caller.msg("|yYou already have a character!|n")
-            caller.msg("To create a new character, please contact a GM.")
-            return
+        try:
+            if WitcherCharacter.objects.filter(db_object=caller).exists():
+                caller.msg("|yYou already have a character!|n")
+                caller.msg("To create a new character, please contact a GM.")
+                return
+        except:
+            pass  # Handle case where character doesn't exist yet
 
         # Check for pending request
         pending = UnifiedRequest.objects.filter(
@@ -61,26 +105,588 @@ class CmdRequestChar(Command):
 
         if pending:
             caller.msg("|yYou already have a pending character generation request.|n")
-            caller.msg("Use |wgmrequests|n to check the status.")
+            caller.msg("Use |wmyrequests|n to check the status.")
             return
 
+        # Start interactive character generation
         caller.msg(
-            "=" * 70 + "\n"
-            "Character Generation Request\n" +
+            "\n" + "=" * 70 + "\n"
+            "|wCharacter Generation Request|n\n" +
             "=" * 70 + "\n\n"
-            "This will create a request for GM approval.\n\n"
-            "|rNOTE:|n Full interactive character generation not yet implemented.\n"
-            "For now, please contact a GM directly to create your character.\n\n"
-            "The character generation system will include:\n"
-            "  - Choose vocation (Witcher, Soldier, Merchant, Artisan, etc.)\n"
-            "  - Allocate 24 stat points\n"
-            "  - Allocate 25 skill points\n"
-            "  - Choose country of origin\n"
-            "  - Select social rank\n"
-            "  - Write character background\n\n"
-            "Once submitted, a GM will review and approve/deny your request.\n" +
-            "=" * 70
+            "Welcome to character creation! This process will guide you through\n"
+            "creating a character for GM approval.\n\n"
+            "You can type |wquit|n at any time to cancel.\n\n"
+            "=" * 70 + "\n"
         )
+
+        # Initialize chargen state on the caller
+        caller.ndb.chargen = {
+            'step': 'name',
+            'name': None,
+            'vocation': None,
+            'race': None,
+            'country': None,
+            'social_rank': 2,
+            'stats': {
+                'strength': 1, 'agility': 1, 'endurance': 1, 'reflexes': 1,
+                'wit': 1, 'intelligence': 1, 'willpower': 1, 'perception': 1,
+                'charm': 1, 'appearance': 1, 'graces': 1, 'cunning': 1
+            },
+            'skills': {},
+            'background': None
+        }
+
+        # Add the chargen input handler cmdset
+        caller.cmdset.add(ChargenInputCmdSet)
+
+        # Start with name prompt
+        self._prompt_name(caller)
+
+    def _cleanup_chargen(self, caller):
+        """Clean up chargen state and remove cmdset."""
+        if hasattr(caller.ndb, 'chargen'):
+            del caller.ndb.chargen
+        if hasattr(caller.ndb, '_chargen_callback'):
+            del caller.ndb._chargen_callback
+        caller.cmdset.remove(ChargenInputCmdSet)
+
+    def _prompt_name(self, caller):
+        """Prompt for character name."""
+        caller.msg("\n|wStep 1: Character Name|n")
+        caller.msg("What is your character's name?")
+        caller.msg("Type the name you want for your character:")
+
+        # Set up a callback for the next input
+        def _name_callback(caller, raw_string, **kwargs):
+            name = raw_string.strip()
+            if name.lower() == 'quit':
+                caller.msg("|yCharacter generation cancelled.|n")
+                self._cleanup_chargen(caller)
+                return
+
+            if not name or len(name) < 2:
+                caller.msg("|rName must be at least 2 characters long.|n")
+                self._prompt_name(caller)
+                return
+
+            caller.ndb.chargen['name'] = name
+            caller.ndb.chargen['step'] = 'vocation'
+            self._prompt_vocation(caller)
+
+        caller.ndb._chargen_callback = _name_callback
+
+    def _prompt_vocation(self, caller):
+        """Prompt for vocation selection."""
+        vocations = Vocation.objects.all().order_by('name')
+
+        caller.msg("\n|wStep 2: Choose Your Vocation|n")
+        caller.msg("Select your character's vocation/class:\n")
+
+        for i, voc in enumerate(vocations, 1):
+            caller.msg(f"  {i}. |c{voc.get_name_display()}|n - {voc.description[:60]}...")
+
+        caller.msg("\nType the number of your choice:")
+
+        def _vocation_callback(caller, raw_string, **kwargs):
+            choice = raw_string.strip()
+            if choice.lower() == 'quit':
+                caller.msg("|yCharacter generation cancelled.|n")
+                self._cleanup_chargen(caller)
+                return
+
+            try:
+                choice_num = int(choice)
+                vocations_list = list(vocations)
+                if 1 <= choice_num <= len(vocations_list):
+                    chosen_voc = vocations_list[choice_num - 1]
+                    caller.ndb.chargen['vocation'] = chosen_voc.id
+                    caller.ndb.chargen['step'] = 'race'
+                    self._prompt_race(caller)
+                else:
+                    caller.msg("|rInvalid choice. Please select a valid number.|n")
+                    self._prompt_vocation(caller)
+            except ValueError:
+                caller.msg("|rPlease enter a number.|n")
+                self._prompt_vocation(caller)
+
+        caller.ndb._chargen_callback = _vocation_callback
+
+    def _prompt_race(self, caller):
+        """Prompt for race selection."""
+        races = ['Human', 'Elf', 'Dwarf', 'Halfling', 'Witcher']
+
+        caller.msg("\n|wStep 3: Choose Your Race|n")
+        caller.msg("Select your character's race:\n")
+
+        for i, race in enumerate(races, 1):
+            caller.msg(f"  {i}. |c{race}|n")
+
+        caller.msg("\nType the number of your choice:")
+
+        def _race_callback(caller, raw_string, **kwargs):
+            choice = raw_string.strip()
+            if choice.lower() == 'quit':
+                caller.msg("|yCharacter generation cancelled.|n")
+                self._cleanup_chargen(caller)
+                return
+
+            try:
+                choice_num = int(choice)
+                if 1 <= choice_num <= len(races):
+                    caller.ndb.chargen['race'] = races[choice_num - 1]
+                    caller.ndb.chargen['step'] = 'country'
+                    self._prompt_country(caller)
+                else:
+                    caller.msg("|rInvalid choice. Please select a valid number.|n")
+                    self._prompt_race(caller)
+            except ValueError:
+                caller.msg("|rPlease enter a number.|n")
+                self._prompt_race(caller)
+
+        caller.ndb._chargen_callback = _race_callback
+
+    def _prompt_country(self, caller):
+        """Prompt for country selection."""
+        countries = Country.objects.all().order_by('name')
+
+        caller.msg("\n|wStep 4: Choose Country of Origin|n")
+        caller.msg("Select your character's country:\n")
+
+        for i, country in enumerate(countries, 1):
+            caller.msg(f"  {i}. |c{country.get_name_display()}|n (+1 {country.bonus_stat.title()})")
+
+        caller.msg("\nType the number of your choice:")
+
+        def _country_callback(caller, raw_string, **kwargs):
+            choice = raw_string.strip()
+            if choice.lower() == 'quit':
+                caller.msg("|yCharacter generation cancelled.|n")
+                self._cleanup_chargen(caller)
+                return
+
+            try:
+                choice_num = int(choice)
+                countries_list = list(countries)
+                if 1 <= choice_num <= len(countries_list):
+                    chosen_country = countries_list[choice_num - 1]
+                    caller.ndb.chargen['country'] = chosen_country.id
+                    caller.ndb.chargen['step'] = 'social_rank'
+                    self._prompt_social_rank(caller)
+                else:
+                    caller.msg("|rInvalid choice. Please select a valid number.|n")
+                    self._prompt_country(caller)
+            except ValueError:
+                caller.msg("|rPlease enter a number.|n")
+                self._prompt_country(caller)
+
+        caller.ndb._chargen_callback = _country_callback
+
+    def _prompt_social_rank(self, caller):
+        """Prompt for social rank selection."""
+        vocation = Vocation.objects.get(id=caller.ndb.chargen['vocation'])
+        max_rank = WitcherCharacter.get_max_rank_for_vocation(vocation.name)
+
+        ranks = [
+            (1, 'Rank 1 - Outcast', -5),
+            (2, 'Rank 2 - Commoner', 0),
+            (3, 'Rank 3 - Knight/Small Gentry', +1),
+            (4, 'Rank 4 - Landed Gentry', +2),
+            (5, 'Rank 5 - Royalty', +3),
+        ]
+
+        caller.msg("\n|wStep 5: Choose Social Rank|n")
+        caller.msg(f"Select your character's social rank (max {max_rank} for {vocation.get_name_display()}):\n")
+
+        for rank_num, rank_name, cr_mod in ranks:
+            if rank_num <= max_rank:
+                caller.msg(f"  {rank_num}. |c{rank_name}|n ({cr_mod:+d} CR)")
+            else:
+                caller.msg(f"  {rank_num}. |K{rank_name} (Unavailable for your vocation)|n")
+
+        caller.msg("\nType the number of your choice:")
+
+        def _rank_callback(caller, raw_string, **kwargs):
+            choice = raw_string.strip()
+            if choice.lower() == 'quit':
+                caller.msg("|yCharacter generation cancelled.|n")
+                self._cleanup_chargen(caller)
+                return
+
+            try:
+                choice_num = int(choice)
+                if 1 <= choice_num <= 5:
+                    if choice_num <= max_rank:
+                        caller.ndb.chargen['social_rank'] = choice_num
+                        caller.ndb.chargen['step'] = 'stats'
+                        self._prompt_stats(caller)
+                    else:
+                        caller.msg(f"|rYour vocation can only have rank {max_rank} or lower.|n")
+                        self._prompt_social_rank(caller)
+                else:
+                    caller.msg("|rInvalid choice. Please select 1-5.|n")
+                    self._prompt_social_rank(caller)
+            except ValueError:
+                caller.msg("|rPlease enter a number.|n")
+                self._prompt_social_rank(caller)
+
+        caller.ndb._chargen_callback = _rank_callback
+
+    def _prompt_stats(self, caller):
+        """Prompt for stat allocation."""
+        stats = caller.ndb.chargen['stats']
+        total_spent = sum(v - 1 for v in stats.values())
+        remaining = WitcherCharacter.STAT_POINTS - total_spent
+
+        caller.msg("\n|wStep 6: Allocate Stats|n")
+        caller.msg(f"You have |y{remaining}|n points remaining out of {WitcherCharacter.STAT_POINTS}.")
+        caller.msg("Each stat starts at 1. Maximum is 10.\n")
+
+        caller.msg("|wPhysical Stats:|n")
+        caller.msg(f"  STR (Strength):    {stats['strength']}")
+        caller.msg(f"  AGI (Agility):     {stats['agility']}")
+        caller.msg(f"  END (Endurance):   {stats['endurance']}")
+        caller.msg(f"  REF (Reflexes):    {stats['reflexes']}\n")
+
+        caller.msg("|wMental Stats:|n")
+        caller.msg(f"  WIT (Wit):           {stats['wit']}")
+        caller.msg(f"  INT (Intelligence):  {stats['intelligence']}")
+        caller.msg(f"  WIL (Willpower):     {stats['willpower']}")
+        caller.msg(f"  PER (Perception):    {stats['perception']}\n")
+
+        caller.msg("|wSocial Stats:|n")
+        caller.msg(f"  CHA (Charm):       {stats['charm']}")
+        caller.msg(f"  APP (Appearance):  {stats['appearance']}")
+        caller.msg(f"  GRA (Graces):      {stats['graces']}")
+        caller.msg(f"  CUN (Cunning):     {stats['cunning']}\n")
+
+        caller.msg("To set a stat: |wSTR 5|n, |wAGI 4|n, etc.")
+        caller.msg("Type |wdone|n when finished, |wreset|n to start over.")
+
+        def _stats_callback(caller, raw_string, **kwargs):
+            input_str = raw_string.strip()
+            if input_str.lower() == 'quit':
+                caller.msg("|yCharacter generation cancelled.|n")
+                self._cleanup_chargen(caller)
+                return
+
+            if input_str.lower() == 'done':
+                # Validate allocation
+                is_valid, error, points_spent = WitcherCharacter.validate_stat_allocation(
+                    caller.ndb.chargen['stats']
+                )
+                if is_valid:
+                    caller.ndb.chargen['step'] = 'skills'
+                    self._prompt_skills(caller)
+                else:
+                    caller.msg(f"|r{error}|n")
+                    self._prompt_stats(caller)
+                return
+
+            if input_str.lower() == 'reset':
+                caller.ndb.chargen['stats'] = {
+                    'strength': 1, 'agility': 1, 'endurance': 1, 'reflexes': 1,
+                    'wit': 1, 'intelligence': 1, 'willpower': 1, 'perception': 1,
+                    'charm': 1, 'appearance': 1, 'graces': 1, 'cunning': 1
+                }
+                caller.msg("|yStats reset to base values.|n")
+                self._prompt_stats(caller)
+                return
+
+            # Parse stat input
+            parts = input_str.split()
+            if len(parts) != 2:
+                caller.msg("|rFormat: STAT VALUE (e.g., STR 5)|n")
+                self._prompt_stats(caller)
+                return
+
+            stat_abbr = parts[0].lower()
+            try:
+                value = int(parts[1])
+            except ValueError:
+                caller.msg("|rValue must be a number.|n")
+                self._prompt_stats(caller)
+                return
+
+            stat_map = {
+                'str': 'strength', 'agi': 'agility', 'end': 'endurance', 'ref': 'reflexes',
+                'wit': 'wit', 'int': 'intelligence', 'wil': 'willpower', 'per': 'perception',
+                'cha': 'charm', 'app': 'appearance', 'gra': 'graces', 'cun': 'cunning'
+            }
+
+            if stat_abbr not in stat_map:
+                caller.msg("|rUnknown stat. Use STR, AGI, END, REF, WIT, INT, WIL, PER, CHA, APP, GRA, CUN|n")
+                self._prompt_stats(caller)
+                return
+
+            stat_name = stat_map[stat_abbr]
+
+            if value < 1 or value > 10:
+                caller.msg("|rStat must be between 1 and 10.|n")
+                self._prompt_stats(caller)
+                return
+
+            caller.ndb.chargen['stats'][stat_name] = value
+            caller.msg(f"|gSet {stat_name} to {value}|n")
+            self._prompt_stats(caller)
+
+        caller.ndb._chargen_callback = _stats_callback
+
+    def _prompt_skills(self, caller):
+        """Prompt for skill allocation."""
+        skills = caller.ndb.chargen['skills']
+        total_cost = sum(WitcherCharacter.calculate_skill_cost(v) for v in skills.values())
+        remaining = WitcherCharacter.SKILL_POINTS - total_cost
+
+        caller.msg("\n|wStep 7: Allocate Skills|n")
+        caller.msg(f"You have |y{remaining}|n points remaining out of {WitcherCharacter.SKILL_POINTS}.")
+        caller.msg("Skills 0-4 cost 1 point per level. Skills 5+ cost 2 points per level above 4.")
+        caller.msg("|yOnly ONE skill can start at 5 or higher.|n\n")
+
+        caller.msg("|wWeapon Skills:|n")
+        caller.msg(f"  blades:    {skills.get('blades', 0)}  (cost: {WitcherCharacter.calculate_skill_cost(skills.get('blades', 0))})")
+        caller.msg(f"  axes:      {skills.get('axes', 0)}  (cost: {WitcherCharacter.calculate_skill_cost(skills.get('axes', 0))})")
+        caller.msg(f"  maces:     {skills.get('maces', 0)}  (cost: {WitcherCharacter.calculate_skill_cost(skills.get('maces', 0))})")
+        caller.msg(f"  spears:    {skills.get('spears', 0)}  (cost: {WitcherCharacter.calculate_skill_cost(skills.get('spears', 0))})")
+        caller.msg(f"  crossbows: {skills.get('crossbows', 0)}  (cost: {WitcherCharacter.calculate_skill_cost(skills.get('crossbows', 0))})")
+        caller.msg(f"  brawling:  {skills.get('brawling', 0)}  (cost: {WitcherCharacter.calculate_skill_cost(skills.get('brawling', 0))})\n")
+
+        caller.msg("|wSpecial Skills:|n")
+        caller.msg(f"  alchemy:      {skills.get('alchemy', 0)}  (cost: {WitcherCharacter.calculate_skill_cost(skills.get('alchemy', 0))})")
+        caller.msg(f"  magery:       {skills.get('magery', 0)}  (cost: {WitcherCharacter.calculate_skill_cost(skills.get('magery', 0))})")
+        caller.msg(f"  sign_sorcery: {skills.get('sign_sorcery', 0)}  (cost: {WitcherCharacter.calculate_skill_cost(skills.get('sign_sorcery', 0))})\n")
+
+        caller.msg("|wCrafting Skills:|n")
+        caller.msg(f"  smithing:  {skills.get('smithing', 0)}  (cost: {WitcherCharacter.calculate_skill_cost(skills.get('smithing', 0))})")
+        caller.msg(f"  carpentry: {skills.get('carpentry', 0)}  (cost: {WitcherCharacter.calculate_skill_cost(skills.get('carpentry', 0))})")
+        caller.msg(f"  herbalism: {skills.get('herbalism', 0)}  (cost: {WitcherCharacter.calculate_skill_cost(skills.get('herbalism', 0))})\n")
+
+        caller.msg("|wGeneral/Support Skills:|n")
+        caller.msg(f"  athletics:  {skills.get('athletics', 0)}  (cost: {WitcherCharacter.calculate_skill_cost(skills.get('athletics', 0))})")
+        caller.msg(f"  resistance: {skills.get('resistance', 0)}  (cost: {WitcherCharacter.calculate_skill_cost(skills.get('resistance', 0))})")
+        caller.msg(f"  leadership: {skills.get('leadership', 0)}  (cost: {WitcherCharacter.calculate_skill_cost(skills.get('leadership', 0))})")
+        caller.msg(f"  tactics:    {skills.get('tactics', 0)}  (cost: {WitcherCharacter.calculate_skill_cost(skills.get('tactics', 0))})\n")
+
+        caller.msg("To set a skill: |wblades 5|n, |walchemy 3|n, etc.")
+        caller.msg("Type |wdone|n when finished, |wreset|n to start over.")
+
+        def _skills_callback(caller, raw_string, **kwargs):
+            input_str = raw_string.strip()
+            if input_str.lower() == 'quit':
+                caller.msg("|yCharacter generation cancelled.|n")
+                self._cleanup_chargen(caller)
+                return
+
+            if input_str.lower() == 'done':
+                # Validate allocation
+                is_valid, error = WitcherCharacter.validate_skill_allocation(
+                    caller.ndb.chargen['skills']
+                )
+                if is_valid:
+                    caller.ndb.chargen['step'] = 'background'
+                    self._prompt_background(caller)
+                else:
+                    caller.msg(f"|r{error}|n")
+                    self._prompt_skills(caller)
+                return
+
+            if input_str.lower() == 'reset':
+                caller.ndb.chargen['skills'] = {}
+                caller.msg("|ySkills reset.|n")
+                self._prompt_skills(caller)
+                return
+
+            # Parse skill input
+            parts = input_str.split()
+            if len(parts) != 2:
+                caller.msg("|rFormat: SKILL VALUE (e.g., blades 5)|n")
+                self._prompt_skills(caller)
+                return
+
+            skill_name = parts[0].lower()
+            try:
+                value = int(parts[1])
+            except ValueError:
+                caller.msg("|rValue must be a number.|n")
+                self._prompt_skills(caller)
+                return
+
+            valid_skills = [
+                'blades', 'axes', 'maces', 'spears', 'crossbows', 'brawling',
+                'alchemy', 'magery', 'sign_sorcery',
+                'smithing', 'carpentry', 'herbalism',
+                'athletics', 'resistance', 'leadership', 'tactics'
+            ]
+
+            if skill_name not in valid_skills:
+                caller.msg(f"|rUnknown skill. Valid skills: {', '.join(valid_skills)}|n")
+                self._prompt_skills(caller)
+                return
+
+            if value < 0 or value > 10:
+                caller.msg("|rSkill must be between 0 and 10.|n")
+                self._prompt_skills(caller)
+                return
+
+            if value == 0 and skill_name in caller.ndb.chargen['skills']:
+                del caller.ndb.chargen['skills'][skill_name]
+                caller.msg(f"|gRemoved {skill_name}|n")
+            else:
+                caller.ndb.chargen['skills'][skill_name] = value
+                caller.msg(f"|gSet {skill_name} to {value} (cost: {WitcherCharacter.calculate_skill_cost(value)})|n")
+
+            self._prompt_skills(caller)
+
+        caller.ndb._chargen_callback = _skills_callback
+
+    def _prompt_background(self, caller):
+        """Prompt for character background."""
+        caller.msg("\n|wStep 8: Character Background|n")
+        caller.msg("Write a brief background for your character (minimum 100 characters).")
+        caller.msg("Describe your character's history, personality, goals, and how they")
+        caller.msg("fit into the Witcher world.\n")
+        caller.msg("When finished, type |wdone|n on a new line.")
+        caller.msg("Start typing your background:\n")
+
+        # Use a list to accumulate background lines
+        if 'background_lines' not in caller.ndb.chargen:
+            caller.ndb.chargen['background_lines'] = []
+
+        def _background_callback(caller, raw_string, **kwargs):
+            input_str = raw_string.strip()
+
+            if input_str.lower() == 'quit':
+                caller.msg("|yCharacter generation cancelled.|n")
+                self._cleanup_chargen(caller)
+                return
+
+            if input_str.lower() == 'done':
+                background = '\n'.join(caller.ndb.chargen['background_lines'])
+                if len(background) < 100:
+                    caller.msg("|rBackground must be at least 100 characters. Please continue writing.|n")
+                    self._prompt_background(caller)
+                    return
+
+                caller.ndb.chargen['background'] = background
+                caller.ndb.chargen['step'] = 'review'
+                self._show_review(caller)
+                return
+
+            # Add line to background
+            caller.ndb.chargen['background_lines'].append(raw_string)
+            # Continue collecting
+            caller.ndb._chargen_callback = _background_callback
+
+        caller.ndb._chargen_callback = _background_callback
+
+    def _show_review(self, caller):
+        """Show character summary and prompt for final confirmation."""
+        data = caller.ndb.chargen
+        vocation = Vocation.objects.get(id=data['vocation'])
+        country = Country.objects.get(id=data['country'])
+
+        caller.msg("\n" + "=" * 70)
+        caller.msg("|wCHARACTER SUMMARY - Please Review|n")
+        caller.msg("=" * 70)
+        caller.msg(f"\n|wName:|n {data['name']}")
+        caller.msg(f"|wVocation:|n {vocation.get_name_display()}")
+        caller.msg(f"|wRace:|n {data['race']}")
+        caller.msg(f"|wCountry:|n {country.get_name_display()} (+1 {country.bonus_stat.title()})")
+        caller.msg(f"|wSocial Rank:|n {data['social_rank']}\n")
+
+        caller.msg("|wStats:|n")
+        stats = data['stats']
+        total_spent = sum(v - 1 for v in stats.values())
+        caller.msg(f"  Physical: STR {stats['strength']}, AGI {stats['agility']}, END {stats['endurance']}, REF {stats['reflexes']}")
+        caller.msg(f"  Mental:   WIT {stats['wit']}, INT {stats['intelligence']}, WIL {stats['willpower']}, PER {stats['perception']}")
+        caller.msg(f"  Social:   CHA {stats['charm']}, APP {stats['appearance']}, GRA {stats['graces']}, CUN {stats['cunning']}")
+        caller.msg(f"  (Total spent: {total_spent}/{WitcherCharacter.STAT_POINTS})\n")
+
+        caller.msg("|wSkills:|n")
+        skills = data['skills']
+        total_cost = sum(WitcherCharacter.calculate_skill_cost(v) for v in skills.values())
+        for skill_name, skill_level in sorted(skills.items()):
+            cost = WitcherCharacter.calculate_skill_cost(skill_level)
+            caller.msg(f"  {skill_name}: {skill_level} (cost: {cost})")
+        caller.msg(f"  (Total spent: {total_cost}/{WitcherCharacter.SKILL_POINTS})\n")
+
+        caller.msg("|wBackground:|n")
+        caller.msg(data['background'])
+        caller.msg("\n" + "=" * 70)
+
+        caller.msg("\nType |wsubmit|n to submit this character for GM approval,")
+        caller.msg("or |wcancel|n to cancel character generation.")
+
+        def _review_callback(caller, raw_string, **kwargs):
+            input_str = raw_string.strip().lower()
+
+            if input_str == 'cancel' or input_str == 'quit':
+                caller.msg("|yCharacter generation cancelled.|n")
+                self._cleanup_chargen(caller)
+                return
+
+            if input_str == 'submit':
+                self._submit_request(caller)
+                return
+
+            caller.msg("|rPlease type 'submit' to submit or 'cancel' to cancel.|n")
+            caller.ndb._chargen_callback = _review_callback
+
+        caller.ndb._chargen_callback = _review_callback
+
+    def _submit_request(self, caller):
+        """Submit the character generation request."""
+        data = caller.ndb.chargen
+        vocation = Vocation.objects.get(id=data['vocation'])
+        country = Country.objects.get(id=data['country'])
+
+        # Create unified request
+        unified_request = UnifiedRequest.objects.create(
+            requestor=caller,
+            request_type='chargen',
+            title=f"Character: {data['name']} ({vocation.get_name_display()})",
+            description=f"New character creation request for {data['name']}, a {data['race']} {vocation.get_name_display()}.",
+            priority='normal'
+        )
+
+        # Create character generation request
+        chargen_request = CharacterGenerationRequest.objects.create(
+            unified_request=unified_request,
+            character_name=data['name'],
+            vocation=vocation,
+            race=data['race'],
+            country=country,
+            social_rank=data['social_rank'],
+            stats_allocation=data['stats'],
+            skills_allocation=data['skills'],
+            background=data['background']
+        )
+
+        # Validate the request
+        is_valid, errors = chargen_request.validate_allocations()
+
+        # Clean up
+        self._cleanup_chargen(caller)
+
+        # Notify player
+        caller.msg("\n" + "=" * 70)
+        caller.msg("|gCharacter generation request submitted!|n")
+        caller.msg("=" * 70)
+        caller.msg(f"\nRequest ID: |w#{unified_request.id}|n")
+        caller.msg(f"Character: |c{data['name']}|n")
+        caller.msg(f"Status: |yPending GM Approval|n\n")
+
+        if is_valid:
+            caller.msg("|gValidation: All allocations are mechanically valid.|n")
+        else:
+            caller.msg("|yValidation Issues:|n")
+            for error in errors:
+                caller.msg(f"  - {error}")
+            caller.msg("\n|yNote:|n Your request is still submitted, but the GM will need to")
+            caller.msg("review these validation issues.")
+
+        caller.msg("\nUse |wmyrequests|n to check the status of your request.")
+        caller.msg("A GM will review your character and approve or deny it.\n")
+        caller.msg("=" * 70)
 
 
 class CmdGMRequests(Command):
