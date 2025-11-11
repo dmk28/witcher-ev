@@ -2,6 +2,7 @@
 # Adds resistance, leadership, tactics skills and default_skills for vocations
 
 from django.db import migrations, models
+import django.core.validators
 
 
 def populate_skill_packages(apps, schema_editor):
@@ -135,8 +136,8 @@ class Migration(migrations.Migration):
                 default=0,
                 help_text='Physical resistance, damage reduction (used for soak)',
                 validators=[
-                    models.validators.MinValueValidator(0),
-                    models.validators.MaxValueValidator(10)
+                    django.core.validators.MinValueValidator(0),
+                    django.core.validators.MaxValueValidator(10)
                 ]
             ),
         ),
@@ -147,8 +148,8 @@ class Migration(migrations.Migration):
                 default=0,
                 help_text='Military leadership, commanding troops, inspiring allies',
                 validators=[
-                    models.validators.MinValueValidator(0),
-                    models.validators.MaxValueValidator(10)
+                    django.core.validators.MinValueValidator(0),
+                    django.core.validators.MaxValueValidator(10)
                 ]
             ),
         ),
@@ -159,8 +160,8 @@ class Migration(migrations.Migration):
                 default=0,
                 help_text='Tactical planning, battlefield strategy, military knowledge',
                 validators=[
-                    models.validators.MinValueValidator(0),
-                    models.validators.MaxValueValidator(10)
+                    django.core.validators.MinValueValidator(0),
+                    django.core.validators.MaxValueValidator(10)
                 ]
             ),
         ),

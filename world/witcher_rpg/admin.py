@@ -292,12 +292,12 @@ class WitcherCharacterAdmin(admin.ModelAdmin):
     list_display = [
         'character_name',
         'vocation',
-        'nation',
+        'country',
         'experience_points',
         'created_date'
     ]
-    list_filter = ['vocation', 'nation', 'created_date']
-    search_fields = ['character_name', 'background', 'nation']
+    list_filter = ['vocation', 'country', 'created_date']
+    search_fields = ['character_name', 'background']
     readonly_fields = ['created_date', 'modified_date', 'effective_stats_display']
     list_select_related = ['vocation', 'stats', 'skills']
 
@@ -306,7 +306,7 @@ class WitcherCharacterAdmin(admin.ModelAdmin):
             'fields': ('db_object', 'character_name', 'vocation')
         }),
         ('Background', {
-            'fields': ('nation', 'background')
+            'fields': ('country', 'background')
         }),
         ('Progression', {
             'fields': ('experience_points',)
