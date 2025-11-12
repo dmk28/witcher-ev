@@ -1,0 +1,225 @@
+{% extends "website/base.html" %}
+{% load static %}
+
+{% block titleblock %}Witcher: The Northern Kingdoms{% endblock %}
+
+{% block header_content %}
+<link rel="stylesheet" href="{% static 'website/css/witcher-theme.css' %}" type="text/css">
+{% endblock %}
+
+{% block content %}
+<div class="witcher-landing-page">
+    <!-- Hero Section -->
+    <div class="hero-section">
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+            <h1 class="game-title">
+                <span class="title-main">Witcher</span>
+                <span class="title-sub">The Northern Kingdoms</span>
+            </h1>
+            <p class="game-tagline">A world of monsters, magic, and political intrigue</p>
+
+            <div class="hero-buttons">
+                <a href="{% url 'webclient:index' %}" class="btn btn-primary btn-large">Enter the World</a>
+                <a href="#about" class="btn btn-secondary btn-large">Learn More</a>
+            </div>
+
+            <div class="server-stats">
+                <div class="stat-item">
+                    <span class="stat-number">{{ num_accounts_connected }}</span>
+                    <span class="stat-label">Players Online</span>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat-item">
+                    <span class="stat-number">{{ num_accounts_registered }}</span>
+                    <span class="stat-label">Registered Accounts</span>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat-item">
+                    <span class="stat-number">{{ num_accounts_connected_recent }}</span>
+                    <span class="stat-label">Recent Logins</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- About Section -->
+    <section id="about" class="content-section dark-section">
+        <div class="container">
+            <h2 class="section-title">Welcome to the Northern Kingdoms</h2>
+            <div class="section-divider"></div>
+
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">⚔️</div>
+                    <h3>Deep Combat System</h3>
+                    <p>Engage in strategic turn-based combat with multiple weapon types, stances, and tactical options. Master the blade, axe, or magic to overcome your foes.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">👑</div>
+                    <h3>Political Intrigue</h3>
+                    <p>Navigate the treacherous waters of court politics with our social combat system. Negotiate, seduce, intimidate, or deceive your way to power.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🛡️</div>
+                    <h3>Rich Character System</h3>
+                    <p>Choose from diverse vocations including Witchers, Mages, Knights, and Artisans. Develop your skills and abilities through a flexible advancement system.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">⚒️</div>
+                    <h3>Crafting & Economy</h3>
+                    <p>Master the art of crafting legendary weapons and armor. Trade in bustling markets, haggle with merchants, and build your fortune across the kingdoms.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🏰</div>
+                    <h3>Organizations & Factions</h3>
+                    <p>Join noble houses, guilds, and secret societies. Rise through the ranks, manage organizations, and shape the political landscape of the North.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">📜</div>
+                    <h3>Epic Storytelling</h3>
+                    <p>Participate in GM-run missions and player-driven stories. Your choices matter in a living world that responds to player actions.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Vocations Section -->
+    <section class="content-section light-section">
+        <div class="container">
+            <h2 class="section-title">Choose Your Path</h2>
+            <div class="section-divider"></div>
+
+            <div class="vocations-grid">
+                <div class="vocation-card">
+                    <h3>⚔️ Witcher</h3>
+                    <p>Mutated monster hunters with supernatural abilities and mastery of combat and alchemy.</p>
+                </div>
+
+                <div class="vocation-card">
+                    <h3>🔮 Mage</h3>
+                    <p>Wielders of powerful magic, advisors to kings, and masters of arcane knowledge.</p>
+                </div>
+
+                <div class="vocation-card">
+                    <h3>🛡️ Knight</h3>
+                    <p>Noble warriors bound by honor, skilled in mounted combat and the art of war.</p>
+                </div>
+
+                <div class="vocation-card">
+                    <h3>🗡️ Mercenary</h3>
+                    <p>Battle-hardened sellswords who fight for coin and glory across the war-torn lands.</p>
+                </div>
+
+                <div class="vocation-card">
+                    <h3>🎭 Bard</h3>
+                    <p>Charismatic performers who inspire allies and manipulate enemies with word and song.</p>
+                </div>
+
+                <div class="vocation-card">
+                    <h3>⚒️ Artisan</h3>
+                    <p>Master craftspeople who create legendary weapons, armor, and magical items.</p>
+                </div>
+
+                <div class="vocation-card">
+                    <h3>🏹 Ranger</h3>
+                    <p>Wilderness scouts expert in tracking, survival, and archery.</p>
+                </div>
+
+                <div class="vocation-card">
+                    <h3>🗝️ Spy</h3>
+                    <p>Shadow operatives who gather intelligence and eliminate targets from the darkness.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Getting Started Section -->
+    <section class="content-section dark-section">
+        <div class="container">
+            <h2 class="section-title">Begin Your Journey</h2>
+            <div class="section-divider"></div>
+
+            <div class="getting-started">
+                <div class="step-card">
+                    <div class="step-number">1</div>
+                    <h3>Create Your Account</h3>
+                    <p>Connect to the game and register your account. Choose a unique username and secure password.</p>
+                </div>
+
+                <div class="step-arrow">→</div>
+
+                <div class="step-card">
+                    <div class="step-number">2</div>
+                    <h3>Build Your Character</h3>
+                    <p>Select your vocation, distribute stats, and choose skills that match your playstyle.</p>
+                </div>
+
+                <div class="step-arrow">→</div>
+
+                <div class="step-card">
+                    <div class="step-number">3</div>
+                    <h3>Enter the World</h3>
+                    <p>Once approved by a GM, begin your adventures in the war-torn Northern Kingdoms.</p>
+                </div>
+            </div>
+
+            <div class="cta-section">
+                <h3>Ready to start your adventure?</h3>
+                <a href="{% url 'webclient:index' %}" class="btn btn-primary btn-large btn-cta">Launch Web Client</a>
+                <p class="connection-info">
+                    <strong>Or connect via MUD client:</strong><br>
+                    Host: localhost | Port: 4000
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer Info -->
+    <section class="content-section footer-section">
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-column">
+                    <h4>About</h4>
+                    <p>A text-based roleplaying game set in a world inspired by The Witcher universe, featuring deep systems and player-driven stories.</p>
+                </div>
+
+                <div class="footer-column">
+                    <h4>Systems</h4>
+                    <ul>
+                        <li>Turn-based combat</li>
+                        <li>Social intrigue system</li>
+                        <li>Crafting & economy</li>
+                        <li>Organizations & politics</li>
+                    </ul>
+                </div>
+
+                <div class="footer-column">
+                    <h4>Resources</h4>
+                    <ul>
+                        <li><a href="#">Character Guide</a></li>
+                        <li><a href="#">Combat Mechanics</a></li>
+                        <li><a href="#">Lore & Setting</a></li>
+                        <li><a href="#">Rules & Policies</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-column">
+                    <h4>Community</h4>
+                    <p>Join our community and stay updated on game events, updates, and announcements.</p>
+                </div>
+            </div>
+
+            <div class="copyright">
+                <p>Powered by Evennia {{ evennia_version }} | Game Version 1.0</p>
+                <p><small>This is a non-commercial fan project. The Witcher® is a registered trademark of CD Projekt Red and based on works by Andrzej Sapkowski.</small></p>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
