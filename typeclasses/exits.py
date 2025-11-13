@@ -18,9 +18,35 @@ class Exit(ObjectParent, DefaultExit):
     they defines the `destination` property and overrides some hooks
     and methods to represent the exits.
 
-    See mygame/typeclasses/objects.py for a list of
-    properties and methods available on all Objects child classes like this.
-
+    Enhanced to automatically add single-letter aliases for cardinal directions.
     """
 
-    pass
+    def at_object_creation(self):
+        """
+        Called when exit is first created.
+        Automatically adds short aliases for cardinal directions.
+        """
+        super().at_object_creation()
+
+        # Mapping of direction names to their single-letter aliases
+        direction_aliases = {
+            'north': ['n'],
+            'south': ['s'],
+            'east': ['e'],
+            'west': ['w'],
+            'northeast': ['ne'],
+            'northwest': ['nw'],
+            'southeast': ['se'],
+            'southwest': ['sw'],
+            'up': ['u'],
+            'down': ['d'],
+            'out': ['o'],
+            'in': ['i'],
+            'enter': ['en'],
+            'leave': ['l'],
+        }
+
+        # Add alias if this is a standard direction
+        direction = self.key.lower()
+        if direction in direction_aliases:
+            self.aliases.add(direction_aliases[direction])
