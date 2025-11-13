@@ -11,35 +11,35 @@ from evennia.utils.utils import inherits_from
 from .objects import ObjectParent
 
 
-# Color codes for different areas
+# Color codes for different areas (using truecolor for rich visuals)
 AREA_COLORS = {
-    # Vengerberg areas
-    'temple_district': '|y',
-    'royal_quarter': '|c',
-    'market_ward': '|g',
-    'craftsmen_quarter': '|r',
-    'river_ward': '|b',
-    'northern_woods': '|G',
-    'western_woods': '|x',
-    'iron_mine': '|y',
-    'northern_approach': '|w',
-    'western_approach': '|w',
-    'eastern_river': '|B',
-    'southern_farmlands': '|Y',
-    'southern_river': '|B',
+    # Vengerberg areas - Rich medieval colors
+    'temple_district': '|#FFD700',      # Gold - sacred and wealthy
+    'royal_quarter': '|#9370DB',        # Medium Purple - royal elegance
+    'market_ward': '|#FF8C00',          # Dark Orange - bustling commerce
+    'craftsmen_quarter': '|#CD5C5C',    # Indian Red - forge fires
+    'river_ward': '|#4682B4',           # Steel Blue - water trade
+    'northern_woods': '|#228B22',       # Forest Green - wilderness
+    'western_woods': '|#2F4F2F',        # Dark Slate Gray - dangerous forest
+    'iron_mine': '|#B8860B',            # Dark Goldenrod - ore and earth
+    'northern_approach': '|#D3D3D3',    # Light Gray - traveled roads
+    'western_approach': '|#A9A9A9',     # Dark Gray - lesser roads
+    'eastern_river': '|#00CED1',        # Dark Turquoise - Pontar River
+    'southern_farmlands': '|#9ACD32',   # Yellow Green - fertile fields
+    'southern_river': '|#5F9EA0',       # Cadet Blue - quieter waters
 
-    # Novigrad areas (already color-coded in builder)
-    'temple_district_nov': '|y',
-    'gildorf': '|c',
-    'the_bits': '|r',
-    'harborside': '|b',
-    'glory_lane': '|m',
-    'putrid_grove': '|x',
-    'oxenfurt_gate': '|g',
-    'tretogor_gate': '|Y',
-    'northern_swamps': '|g',
-    'western_forests': '|g',
-    'eastern_coast': '|b',
+    # Novigrad areas - Darker, grimier city colors
+    'temple_district': '|#DAA520',      # Goldenrod - Eternal Fire's gold
+    'gildorf': '|#00CED1',              # Dark Turquoise - wealthy merchant cyan
+    'the_bits': '|#8B0000',             # Dark Red - poverty and blood
+    'harborside': '|#1E90FF',           # Dodger Blue - vast ocean port
+    'glory_lane': '|#FF1493',           # Deep Pink - vice and pleasure
+    'putrid_grove': '|#2F2F2F',         # Very Dark Gray - death and graves
+    'oxenfurt_gate': '|#32CD32',        # Lime Green - scholarly route
+    'tretogor_gate': '|#FFD700',        # Gold - Redanian influence
+    'northern_swamps': '|#556B2F',      # Dark Olive Green - murky swamps
+    'western_forests': '|#228B22',      # Forest Green - trade route woods
+    'eastern_coast': '|#4169E1',        # Royal Blue - ocean coastline
 }
 
 
