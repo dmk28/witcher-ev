@@ -34,6 +34,12 @@ from evennia.settings_default import *
 # This is the name of your game. Make it catchy!
 SERVERNAME = "Witcher: The Northern Kingdoms"
 
+# Starting location for new accounts (OOC Lobby)
+START_LOCATION = "#12840"
+
+# Default home/fallback location
+DEFAULT_HOME = "#12840"
+
 ######################################################################
 # Witcher RPG Configuration
 ######################################################################

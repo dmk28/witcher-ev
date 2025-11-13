@@ -100,6 +100,10 @@ from commands.comms_commands import (
     CmdChannelCreate,
     CmdChannelDelete
 )
+from commands.navigation import (
+    CmdCoords,
+    CmdGoto
+)
 
 
 class CharacterCmdSet(default_cmds.CharacterCmdSet):
@@ -210,6 +214,10 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         # GM commands
         self.add(CmdChannelCreate())
         self.add(CmdChannelDelete())
+
+        # Add navigation commands
+        self.add(CmdCoords())
+        self.add(CmdGoto())
 
 
 class AccountCmdSet(default_cmds.AccountCmdSet):

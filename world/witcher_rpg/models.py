@@ -417,6 +417,10 @@ class WitcherCharacter(models.Model):
         blank=True,
         help_text="Character background and history"
     )
+    physical_description = models.TextField(
+        blank=True,
+        help_text="Physical appearance: height, build, hair, eyes, distinguishing features, etc."
+    )
 
     # Race and combat specialization
     race = models.CharField(

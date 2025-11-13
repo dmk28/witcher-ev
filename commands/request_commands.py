@@ -133,6 +133,7 @@ class CmdRequestChar(Command):
                 'charm': 1, 'appearance': 1, 'graces': 1, 'cunning': 1
             },
             'skills': {},
+            'physical_description': None,
             'background': None
         }
 
@@ -482,8 +483,8 @@ class CmdRequestChar(Command):
                     caller.ndb.chargen['skills']
                 )
                 if is_valid:
-                    caller.ndb.chargen['step'] = 'background'
-                    self._prompt_background(caller)
+                    caller.ndb.chargen['step'] = 'physical_description'
+                    self._prompt_physical_description(caller)
                 else:
                     caller.msg(f"|r{error}|n")
                     self._prompt_skills(caller)
@@ -538,9 +539,49 @@ class CmdRequestChar(Command):
 
         caller.ndb._chargen_callback = _skills_callback
 
+    def _prompt_physical_description(self, caller):
+        """Prompt for character physical description."""
+        caller.msg("\n|wStep 8: Physical Description|n")
+        caller.msg("Describe your character's physical appearance (minimum 50 characters).")
+        caller.msg("Include details like height, build, hair, eyes, distinctive features,")
+        caller.msg("scars, tattoos, typical clothing, etc.\n")
+        caller.msg("When finished, type |wdone|n on a new line.")
+        caller.msg("Start typing your description:\n")
+
+        # Use a list to accumulate description lines
+        if 'description_lines' not in caller.ndb.chargen:
+            caller.ndb.chargen['description_lines'] = []
+
+        def _description_callback(caller, raw_string, **kwargs):
+            input_str = raw_string.strip()
+
+            if input_str.lower() == 'quit':
+                caller.msg("|yCharacter generation cancelled.|n")
+                self._cleanup_chargen(caller)
+                return
+
+            if input_str.lower() == 'done':
+                description = '\n'.join(caller.ndb.chargen['description_lines'])
+                if len(description) < 50:
+                    caller.msg("|rPhysical description must be at least 50 characters. Please continue writing.|n")
+                    self._prompt_physical_description(caller)
+                    return
+
+                caller.ndb.chargen['physical_description'] = description
+                caller.ndb.chargen['step'] = 'background'
+                self._prompt_background(caller)
+                return
+
+            # Add line to description
+            caller.ndb.chargen['description_lines'].append(raw_string)
+            # Continue collecting
+            caller.ndb._chargen_callback = _description_callback
+
+        caller.ndb._chargen_callback = _description_callback
+
     def _prompt_background(self, caller):
         """Prompt for character background."""
-        caller.msg("\n|wStep 8: Character Background|n")
+        caller.msg("\n|wStep 9: Character Background|n")
         caller.msg("Write a brief background for your character (minimum 100 characters).")
         caller.msg("Describe your character's history, personality, goals, and how they")
         caller.msg("fit into the Witcher world.\n")
@@ -609,7 +650,10 @@ class CmdRequestChar(Command):
             caller.msg(f"  {skill_name}: {skill_level} (cost: {cost})")
         caller.msg(f"  (Total spent: {total_cost}/{WitcherCharacter.SKILL_POINTS})\n")
 
-        caller.msg("|wBackground:|n")
+        caller.msg("|wPhysical Description:|n")
+        caller.msg(data['physical_description'])
+
+        caller.msg("\n|wBackground:|n")
         caller.msg(data['background'])
         caller.msg("\n" + "=" * 70)
 
@@ -658,6 +702,7 @@ class CmdRequestChar(Command):
             social_rank=data['social_rank'],
             stats_allocation=data['stats'],
             skills_allocation=data['skills'],
+            physical_description=data['physical_description'],
             background=data['background']
         )
 
@@ -1011,24 +1056,132 @@ class CmdApproveRequest(Command):
     def _handle_chargen_approval(self, request):
         """Handle character generation approval."""
         try:
+            from evennia.utils.create import create_object
+            from typeclasses.characters import WitcherCharacter as WitcherCharacterTypeclass
+            from world.witcher_rpg.models import (
+                WitcherCharacter,
+                CharacterStats,
+                CharacterSkills
+            )
+            from evennia.objects.models import ObjectDB
+
             chargen = request.chargen_details
 
-            # TODO: Actually create the character
-            # For now, just notify
+            # Get Vengerberg Central Market Square as starting location
+            try:
+                start_location = ObjectDB.objects.get(id=595)
+            except ObjectDB.DoesNotExist:
+                # Fallback to Limbo if Vengerberg doesn't exist
+                start_location = ObjectDB.objects.get(id=2)
+
+            # Create the Character object (Evennia entity)
+            char_obj = create_object(
+                WitcherCharacterTypeclass,
+                key=chargen.character_name,
+                location=start_location,
+                home=start_location,
+            )
+
+            # Create CharacterStats
+            stats = CharacterStats.objects.create(
+                strength=chargen.stats_allocation.get('strength', 1),
+                agility=chargen.stats_allocation.get('agility', 1),
+                endurance=chargen.stats_allocation.get('endurance', 1),
+                reflexes=chargen.stats_allocation.get('reflexes', 1),
+                wit=chargen.stats_allocation.get('wit', 1),
+                intelligence=chargen.stats_allocation.get('intelligence', 1),
+                willpower=chargen.stats_allocation.get('willpower', 1),
+                perception=chargen.stats_allocation.get('perception', 1),
+                charm=chargen.stats_allocation.get('charm', 1),
+                appearance=chargen.stats_allocation.get('appearance', 1),
+                graces=chargen.stats_allocation.get('graces', 1),
+                cunning=chargen.stats_allocation.get('cunning', 1),
+            )
+
+            # Determine crafting type and skill from skills_allocation
+            crafting_types = {'smithing': 'smithing', 'carpentry': 'carpentry', 'herbalism': 'herbalism'}
+            crafting_type = 'none'
+            crafting_skill_level = 0
+
+            for craft_name, craft_type in crafting_types.items():
+                if craft_name in chargen.skills_allocation and chargen.skills_allocation[craft_name] > 0:
+                    crafting_type = craft_type
+                    crafting_skill_level = chargen.skills_allocation[craft_name]
+                    break
+
+            # Create CharacterSkills
+            skills = CharacterSkills.objects.create(
+                blades=chargen.skills_allocation.get('blades', 0),
+                axes=chargen.skills_allocation.get('axes', 0),
+                maces=chargen.skills_allocation.get('maces', 0),
+                spears=chargen.skills_allocation.get('spears', 0),
+                crossbows=chargen.skills_allocation.get('crossbows', 0),
+                brawling=chargen.skills_allocation.get('brawling', 0),
+                alchemy=chargen.skills_allocation.get('alchemy', 0),
+                magery=chargen.skills_allocation.get('magery', 0),
+                sign_sorcery=chargen.skills_allocation.get('sign_sorcery', 0),
+                crafting_type=crafting_type,
+                crafting_skill=crafting_skill_level,
+                athletics=chargen.skills_allocation.get('athletics', 0),
+                resistance=chargen.skills_allocation.get('resistance', 0),
+                leadership=chargen.skills_allocation.get('leadership', 0),
+                tactics=chargen.skills_allocation.get('tactics', 0),
+            )
+
+            # Create WitcherCharacter (links everything together)
+            witcher_char = WitcherCharacter.objects.create(
+                db_object=char_obj,
+                character_name=chargen.character_name,
+                vocation=chargen.vocation,
+                stats=stats,
+                skills=skills,
+                country=chargen.country,
+                background=chargen.background,
+                physical_description=chargen.physical_description or "",
+                race=chargen.race.lower(),
+                social_rank=chargen.social_rank,
+            )
+
+            # Link character to account
+            request.requestor.characters.add(char_obj)
+            char_obj.db.account = request.requestor
+
+            # Notify player
             request.requestor.msg(
                 "=" * 70 + "\n"
                 "|g=== Character Generation Request APPROVED ===|n\n" +
                 "=" * 70 + "\n"
-                f"Character: {chargen.character_name}\n"
+                f"Character: |c{chargen.character_name}|n\n"
                 f"Vocation: {chargen.vocation.get_name_display()}\n"
+                f"Race: {chargen.race}\n"
+                f"Country: {chargen.country.get_name_display()}\n"
                 f"Approved by: {request.reviewed_by.name}\n\n"
                 f"{request.review_notes}\n\n"
-                "Your character will be created shortly.\n" +
+                "|gYour character has been created!|n\n"
+                f"Starting location: {start_location.key}\n\n"
+                f"Use |wic {chargen.character_name}|n to enter the game.\n" +
                 "=" * 70
             )
 
+            # Log success
+            self.caller.msg(
+                f"|gCharacter successfully created:|n {chargen.character_name} (#{char_obj.id})"
+            )
+
         except Exception as e:
-            self.caller.msg(f"|rError processing chargen approval:|n {e}")
+            import traceback
+            error_msg = f"Error creating character: {e}\n{traceback.format_exc()}"
+            self.caller.msg(f"|r{error_msg}|n")
+            # Still notify the player that approval happened, but character creation failed
+            request.requestor.msg(
+                "=" * 70 + "\n"
+                "|y=== Character Approved - Manual Creation Required ===|n\n" +
+                "=" * 70 + "\n"
+                "Your character was approved, but there was an error during\n"
+                "automatic creation. Please contact a GM to manually create\n"
+                "your character.\n" +
+                "=" * 70
+            )
 
     def _handle_advancement_approval(self, request):
         """Handle advancement request approval."""

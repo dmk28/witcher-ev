@@ -181,3 +181,46 @@ class Room(ObjectParent, DefaultRoom):
             text = text.replace(token, replacement)
 
         return text
+
+
+class OOCRoom(Room):
+    """
+    Out of Character room for character creation and waiting area.
+
+    This room type restricts commands to only basic actions and
+    character creation commands. Players start here when they first
+    log in and don't have a character yet.
+    """
+
+    def at_object_creation(self):
+        """Called when room is first created."""
+        super().at_object_creation()
+
+        # Set room purpose
+        self.db.room_purpose = 'ooc'
+
+        # Add the OOC command set
+        from commands.ooc_commands import OOCCmdSet
+        self.cmdset.add(OOCCmdSet, persistent=True)
+
+        # Set a default description if none exists
+        if not self.db.desc:
+            self.db.desc = (
+                "|w=== Welcome to The Northern Kingdoms ===|n\n\n"
+                "You are in the Out of Character (OOC) lobby. This is where new\n"
+                "players create their characters before entering the game world.\n\n"
+                "|yTo create a character:|n\n"
+                "  Type |wrequestchar|n to start the interactive character creation\n"
+                "  process. You'll choose your vocation, race, stats, skills, and\n"
+                "  write a background. A Game Master will review and approve your\n"
+                "  character.\n\n"
+                "|yTo check your requests:|n\n"
+                "  Type |wmyrequests|n to see the status of your character request.\n\n"
+                "|yAvailable commands:|n\n"
+                "  |wlook|n     - Look around\n"
+                "  |wwho|n      - See who's online\n"
+                "  |whelp|n     - Get help\n"
+                "  |wquit|n     - Disconnect\n\n"
+                "Once your character is approved, you'll automatically enter the\n"
+                "game world in Vengerberg. Welcome to the Witcher RPG!"
+            )

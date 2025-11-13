@@ -136,7 +136,37 @@ class Account(DefaultAccount):
 
     """
 
-    pass
+    def at_post_login(self, session=None, **kwargs):
+        """
+        Called after successful login.
+
+        For new accounts without characters, this keeps them in the OOC lobby.
+        For accounts with approved characters, this automatically puppets
+        their character.
+        """
+        # Get all characters for this account
+        chars = list(self.characters)
+
+        if not chars:
+            # New account - stays in OOC lobby (controlled by START_LOCATION setting)
+            self.msg(
+                "\n|wWelcome to The Northern Kingdoms!|n\n"
+                "You don't have a character yet. Use |wrequestchar|n to begin\n"
+                "character creation, or |whelp|n for more information.\n"
+            )
+        else:
+            # Has character(s) - auto-puppet the first one
+            # In a multi-character game, you might want a character selection menu here
+            char = chars[0]
+            try:
+                self.puppet_object(session, char)
+                self.msg(f"\n|gWelcome back, {char.key}!|n\n")
+            except Exception as e:
+                self.msg(f"|rError puppeting character:|n {e}\n"
+                        f"Use |wic {char.key}|n to manually enter the game.")
+
+        # Call parent method
+        super().at_post_login(session=session, **kwargs)
 
 
 class Guest(DefaultGuest):

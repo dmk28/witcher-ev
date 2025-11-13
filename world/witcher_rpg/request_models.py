@@ -199,6 +199,12 @@ class CharacterGenerationRequest(models.Model):
         help_text="Character background and concept"
     )
 
+    # Physical description
+    physical_description = models.TextField(
+        blank=True,
+        help_text="Character physical appearance"
+    )
+
     # Validation flags
     stats_valid = models.BooleanField(
         default=False,
